@@ -1888,88 +1888,64 @@ subroutine wghpot_f( gradphi, f )
       end if
 
 !    compute coef_bessel  
-     write(6,*) 'lmax', lmax0, 'kappa', kappa
-     write(6,*) tol_inf, tol_zero 
       do jsph = 1, nsph
         do l0 = 0, lmax0
-            !
-            if ( max(DI_ri(l0,jsph), SI_ri(l0,jsph)) .gt. tol_inf) then
-                termi = kappa
-            else if ( min(DI_ri(l0,jsph), SI_ri(l0,jsph)) .lt. tol_zero) then
-                termi = l0/rsph(jsph)+ (l0+1)*(kappa**2*rsph(jsph))/( (2*l0+1)*(2*l0+3) )
-            else
-                termi = DI_ri(l0,jsph)/SI_ri(l0,jsph)*kappa
-            end if
-            
-            !write(*,*) SI_ri(l0,jsph), termi
-            
-            !
-            if ( SK_ri(l0,jsph).gt. tol_inf) then
-                termk = -(l0+1)/rsph(jsph) - l0*(kappa**2*rsph(jsph))/( (2*l0-1)*(2*l0+1) )
-            else if ( SK_ri(l0,jsph).lt. tol_zero) then
-                termk = -kappa
-            else
-                termk = DK_ri(l0,jsph)/SK_ri(l0,jsph) *kappa
-            end if
-            !
-            !write(*,*) SK_ri(l0,jsph), termk
-            
-            coef_bessel(l0,jsph) = 1/( termi-termk)
-            !write(*,*) DI_ri(l0,jsph), SI_ri(l0,jsph), coef_bessel(l0,jsph)
-            !write(*,*) ( min(-DK_ri(l0,jsph), SK_ri(l0,jsph)) .lt. tol_zero), DK_ri(l0,jsph), termk
+          if ( max(DI_ri(l0,jsph), SI_ri(l0,jsph)) .gt. tol_inf) then
+            termi = kappa
+          else if ( min(DI_ri(l0,jsph), SI_ri(l0,jsph)) .lt. tol_zero) then
+            termi = l0/rsph(jsph)+ (l0+1)*(kappa**2*rsph(jsph))/( (2*l0+1)*(2*l0+3) )
+          else
+            termi = DI_ri(l0,jsph)/SI_ri(l0,jsph)*kappa
+          end if
+          !write(*,*) SI_ri(l0,jsph), termi
+          if ( SK_ri(l0,jsph).gt. tol_inf) then
+            termk = -(l0+1)/rsph(jsph) - l0*(kappa**2*rsph(jsph))/( (2*l0-1)*(2*l0+1) )
+          else if ( SK_ri(l0,jsph).lt. tol_zero) then
+            termk = -kappa
+          else
+            termk = DK_ri(l0,jsph)/SK_ri(l0,jsph) *kappa
+          end if
+          !write(*,*) SK_ri(l0,jsph), termk
+          coef_bessel(l0,jsph) = 1/( termi-termk)
+          !write(*,*) DI_ri(l0,jsph), SI_ri(l0,jsph), coef_bessel(l0,jsph)
+          !write(*,*) ( min(-DK_ri(l0,jsph), SK_ri(l0,jsph)) .lt. tol_zero), DK_ri(l0,jsph), termk
         end do
       end do
-!      
-      ic = 0
-!     loop over spheres
-      do isph = 1, nsph
-        ! not buried
-        write(6,*) iep_lpb(isph+1), iep_lpb(isph)
-        if ( (iep_lpb(isph+1)-iep_lpb(isph)) .gt. 0 ) then 
-          ! loop over exposed grid points
-          do kep = iep_lpb(isph), iep_lpb(isph+1)-1 
-            ! kep represents (isph, ig)
-            ig = ep_lpb(kep) 
-
-!           compute sumSijn
-            sumSijn = 0
-            do jsph = 1, nsph
-                sumSijn_pre = sumSijn
-                 
-                vij  = csph(:,isph) + rsph(isph)*grid(:,ig) - csph(:,jsph)
-                rijn = sqrt( dot_product( vij, vij ) )
-                sijn = vij/rijn
-                
-                call SPHK_bessel( lmax0, rijn*kappa, NM, SK_rijn, DK_rijn )
-                call ylmbas( sijn, basloc, vplm, vcos, vsin )
-
-                !!! Go over only nonzero term                
-                do l0 = 0,lmax0
-                    if (SK_ri(l0,jsph).gt. tol_inf) then
-                        term = ( rsph(jsph)/rijn )**(l0+1)
-                    else if (SK_ri(l0,jsph).lt. tol_zero) then
-                        term = ( rsph(jsph)/rijn )*exp(-kappa*(rijn-rsph(jsph)))
-                    else
-                        term = SK_rijn(l0)/SK_ri(l0,jsph)
-                    end if
-                    coef_Ylm =  coef_bessel(l0,jsph)*term
-                    do m0 = -l0, l0
-                        ind0 = l0**2+l0+m0+1
-                        sumSijn = sumSijn + c0(ind0, jsph)*coef_Ylm* basloc(ind0)
-                        coefY(kep,ind0,jsph) = coef_Ylm* basloc(ind0)
-                    end do
-                end do
-            end do            
 !
-            !write(6,*) sumSijn, epsp, eps, ui(ig,isph)
-!           weigh by (negative) characteristic function and sumSijn
+      do isph = 1, nsph
+        do ig = 1, ngrid
+          if (ui(ig,isph).ne.zero) then
+            sumSijn = zero
+            do jsph = 1, nsph
+              sumSijn_pre = sumSijn
+              vij  = csph(:,isph) + rsph(isph)*grid(:,ig) - csph(:,jsph)
+              rijn = sqrt( dot_product( vij, vij ) )
+              sijn = vij/rijn
+              
+              call SPHK_bessel( lmax0, rijn*kappa, NM, SK_rijn, DK_rijn )
+              call ylmbas( sijn, basloc, vplm, vcos, vsin )
+              do l0 = 0,lmax0
+                if (SK_ri(l0,jsph).gt. tol_inf) then
+                  term = ( rsph(jsph)/rijn )**(l0+1)
+                else if (SK_ri(l0,jsph).lt. tol_zero) then
+                  term = ( rsph(jsph)/rijn )*exp(-kappa*(rijn-rsph(jsph)))
+                else
+                  term = SK_rijn(l0)/SK_ri(l0,jsph)
+                end if
+                coef_Ylm =  coef_bessel(l0,jsph)*term
+                do m0 = -l0, l0
+                  ind0 = l0**2+l0+m0+1
+                  sumSijn = sumSijn + c0(ind0, jsph)*coef_Ylm* basloc(ind0)
+                  coefY(kep,ind0,jsph) = coef_Ylm* basloc(ind0)
+                end do
+              end do
+            end do
             f(ig,isph) = -(epsp/eps)*ui(ig,isph) * sumSijn
-          end do
-        end if
-      enddo
+          end if
+        end do
+      end do 
       deallocate( vplm, basloc, vcos, vsin, SK_rijn, DK_rijn  )
       return
-!
 endsubroutine wghpot_f
 !
 endmodule ddcosmo
