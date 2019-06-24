@@ -8,9 +8,9 @@ FFLAGS = -O3 -march=native -fopenmp
 #RunF77 = pgfortran
 #FFLAGS = -O3 -mp
 
-MODS   = ddcosmo.o
-OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o forces_dd.o efld.o\
-	matvec.o cosmo.o jacobi_diis.o
+MODS   = bessel.o ddcosmo.o
+OBJS   = mkrhs.o llgnew.o ddlpb.o ddcosmo.o forces_dd.o efld.o\
+	matvec.o cosmo.o jacobi_diis.o main.o bessel.o
 #
 all:    $(MODS) $(OBJS)
 	$(RunF77) $(FFLAGS) -o main.exe $(OBJS)

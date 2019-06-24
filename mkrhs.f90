@@ -1,6 +1,6 @@
-subroutine mkrhs(n,charge,x,y,z,ncav,ccav,phi,nylm,psi)
-implicit none
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! 
+!
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
 !      888      888 d88P  Y88b d88P" "Y88b d88P  Y88b 8888b   d8888 d88P" "Y88b 
 !      888      888 888    888 888     888 Y88b.      88888b.d88888 888     888 
@@ -9,12 +9,11 @@ implicit none
 ! 888  888 888  888 888    888 888     888       "888 888  Y8P  888 888     888 
 ! Y88b 888 Y88b 888 Y88b  d88P Y88b. .d88P Y88b  d88P 888   "   888 Y88b. .d88P 
 !  "Y88888  "Y88888  "Y8888P"   "Y88888P"   "Y8888P"  888       888  "Y88888P"  
-!                                                                              
+!
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!  COPYRIGHT (C) 2015 by Filippo Lipparini, Benjamin Stamm, Paolo Gatto        !
-!  Eric Cancès, Yvon Maday, Jean-Philip Piquemal, Louis Lagardère and          !
-!  Benedetta Mennucci.                                                         !
+!  COPYRIGHT (C) 2015 by Filippo Lipparini, Benjamin Stamm, Eric Cancès,       !
+!  Yvon Maday, Jean-Philip Piquemal, Louis Lagardère and Benedetta Mennucci.   !
 !                             ALL RIGHT RESERVED.                              !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -79,45 +78,106 @@ implicit none
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !                                                                              !
-! Silly routine to compute the potential and psi vector                        !
+! Silly routine to compute the potential phi and the psi vector.               !
 !                                                                              !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-integer,                      intent(in)    :: n, ncav, nylm
-real*8,  dimension(n),        intent(in)    :: x, y, z, charge
-real*8,  dimension(3,ncav),   intent(in)    :: ccav
-real*8,  dimension(ncav),     intent(inout) :: phi
-real*8,  dimension(nylm,n),   intent(inout) :: psi
+subroutine mkrhs( n, charge, x, y, z, ncav, ccav, phi, gradphi, nbasis, psi )
+! 
+      implicit none
 !
-integer :: isph, ic, j
-real*8  :: v
-real*8  :: dx, dy, dz, d2, d, pi, fac
-real*8, parameter :: zero=0.0d0, one=1.0d0, four=4.0d0
+      integer,                      intent(in)    :: n, ncav, nbasis
+      real*8,  dimension(n),        intent(in)    :: x, y, z, charge
+      real*8,  dimension(3,ncav),   intent(in)    :: ccav
+      real*8,  dimension(ncav),     intent(out) :: phi
+      real*8,  dimension(3,ncav),   intent(out) :: gradphi
+      real*8,  dimension(nbasis,n), intent(out) :: psi
 !
-pi  = four*atan(one)
-fac = sqrt(four*pi)
-phi = zero
-psi = zero
+      integer :: isph, ic, j, iprint
+      real*8  :: v
+      real*8, dimension(3) :: gradv
+      real*8  :: dx, dy, dz, d2, d, pi, fac
+      real*8, parameter :: zero=0.0d0, one=1.0d0, four=4.0d0
+      real*8, parameter :: epsp=1.0d0
+      
+      integer :: flag
+
+!      
+!-------------------------------------------------------------------------------
 !
-!$omp parallel do default(shared) private(ic,v,j,dx,dy,dz,d2,d)
-do ic = 1, ncav
-  v  = zero
-  do j = 1, n
-    dx = ccav(1,ic) - x(j)
-    dy = ccav(2,ic) - y(j)
-    dz = ccav(3,ic) - z(j)
-    d2 = dx*dx + dy*dy + dz*dz
-    d  = sqrt(d2)
-    v  = v  + charge(j)/d
-  end do
-  phi(ic) = v
-end do
+!     compute factors
+      pi  = four*atan(one)
+      fac = sqrt(four*pi)
 !
-! psi vector:
+!     initialize
+      phi(:) = zero
+      psi(:,:) = zero
+      gradphi(:,:) = zero
 !
-do isph = 1, n
-  psi(1,isph) = fac*charge(isph)
-end do
 !
-return
-end
+!!!      !$omp parallel do default(shared) private(ic,v,j,dx,dy,dz,d2,d)
+!
+!
+!
+!     potential phi
+!     =============
+!
+      do ic = 1, ncav
+!
+        v  = zero
+        gradv = zero
+!
+        do j = 1, n
+!
+          dx = ccav(1,ic) - x(j)
+          dy = ccav(2,ic) - y(j)
+          dz = ccav(3,ic) - z(j)
+!
+          d2 = dx*dx + dy*dy + dz*dz
+          d  = sqrt(d2)
+!          
+          v  = v  + charge(j)/(d*epsp)
+          gradv = gradv - (charge(j)/(epsp*d2))*( (/dx,dy,dz/) /d)
+!          
+        enddo
+!        
+        phi(ic) = v
+        gradphi(:,ic) = gradv
+!        
+      enddo
+!       
+!     psi vector
+!     ==========
+!
+      do isph = 1, n
+!      
+        psi(1,isph) = fac*charge(isph)
+!        
+      end do
+
+      iprint=0
+      if ( iprint.gt.0 ) then
+!
+        write(*,*)'------------------------'
+        write(*,*)'cavity     Potential Phi'
+        write(*,*) ''
+!        
+        do ic = 1,ncav
+          write(*,1000) ic, phi(ic)        
+ 1000     format( 1x,i6,6x,e12.5 )         
+        enddo
+!        
+        write(*,*)'------------------------'
+        write(*,*)'  atom        Psi Vector'
+        write(*,*) ''
+! 
+        do isph = 1,n
+          write(*,1000) isph, psi(1,isph)        
+        enddo
+!
+        write(*,*)'------------------------'
+      endif
+      return
+!
+!
+endsubroutine mkrhs
