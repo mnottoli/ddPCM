@@ -1,5 +1,6 @@
 program main
 use ddcosmo
+use newschwarz
 ! 
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
 !      888      888 d88P  Y88b d88P" "Y88b d88P  Y88b 8888b   d8888 d88P" "Y88b 
@@ -181,9 +182,10 @@ call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nylm,psi)
 !
 ! now, call the ddcosmo solver
 !
-allocate (sigma(nylm,n))
 !
-call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
+!allocate (sigma(nylm,n))
+!call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
+call nddcosmo(phi,psi,esolv)
 !
 if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
 !

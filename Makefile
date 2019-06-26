@@ -4,7 +4,7 @@
 #RunF77 = ifort
 #FFLAGS = -O3 -xHost -qopenmp
 RunF77 = gfortran
-FFLAGS = -O3 -march=native
+FFLAGS = -O3 -march=native -llapack -lblas
 #RunF77 = pgfortran
 #FFLAGS = -O3 -mp
 
