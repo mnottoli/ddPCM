@@ -1,16 +1,16 @@
 #
 #   Makefile for ddCOSMO
 #
-RunF77 = ifort
-FFLAGS = -O3 -xHost -qopenmp
-#RunF77 = gfortran
-#FFLAGS = -O3 -march=native -fopenmp
+#RunF77 = ifort
+#FFLAGS = -O3 -xHost -qopenmp
+RunF77 = gfortran
+FFLAGS = -O3 -march=native
 #RunF77 = pgfortran
 #FFLAGS = -O3 -mp
 
-MODS   = ddcosmo.o
+MODS   = ddcosmo.o newschwarz.o
 OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o forces_dd.o efld.o\
-	matvec.o cosmo.o jacobi_diis.o
+	matvec.o cosmo.o jacobi_diis.o newschwarz.o
 #
 all:    $(MODS) $(OBJS)
 	$(RunF77) $(FFLAGS) -o main.exe $(OBJS)
