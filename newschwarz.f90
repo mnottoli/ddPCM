@@ -3,7 +3,7 @@ use ddcosmo
 implicit none
 ! preconditioner array
 real*8, allocatable :: nlprec(:,:,:)
-real*8, parameter :: p = 1.0d0
+real*8 :: p
 contains
 
 subroutine nddcosmo(phi,psi,esolv)
@@ -16,7 +16,12 @@ subroutine nddcosmo(phi,psi,esolv)
   real*8 :: tol
   logical :: ok
   external :: hnorm, lx
+  integer :: cr, c1, c2, c3
+  integer :: i
   allocate(x(nylm,nsph),rhs(nylm,nsph),scr(ngrid,nsph))
+
+  ! initialize the timer
+  call system_clock(count_rate=cr)
 
   ! build the RHS 
   call wghpot(phi, scr)
@@ -26,18 +31,31 @@ subroutine nddcosmo(phi,psi,esolv)
   ! call prtsph('rhs of the ddCOSMO equation',nsph,0,rhs)
   deallocate(scr)
 
-  ! assemble and store the preconditioner
-  call build_nlprec()
 
-  ! solve ddcosmo 
-  tol     = 10.0d0**(-iconv)
+  do i = 1, 20
+  p = dble(i)*0.1d0
+  ! assemble and store the preconditioner
+  call system_clock(count=c1)
+  call build_nlprec()
+  call system_clock(count=c2)
+
+  ! solve ddcosmo
+  call apply_nlprec(nylm*nsph,rhs,x) 
+  tol = 10.0d0**(-iconv)
   n_iter  = 200
   call jacobi_diis(nsph*nylm,iprint,ndiis,4,tol,rhs,x,n_iter,ok,nlx, &
     & apply_nlprec,hnorm)
-  write(6,*) n_iter 
+  !write(6,*) p, n_iter 
+
+  call system_clock(count=c3)
+  !write(6,'(A15,F15.8)') 'precond time', dble(c2-c1)/dble(cr)
+  !write(6,'(A15,F15.8)') 'solver time', dble(c3-c2)/dble(cr)
 
   ! compute the energy
   esolv = pt5*((eps - one)/eps)*sprod(nsph*nylm,x,psi)
+  write(6,*) p, n_iter, dble(c2-c1)/dble(cr), dble(c2-c1)/dble(cr), esolv
+  end do
+  stop
   return
 end subroutine nddcosmo 
 
@@ -77,16 +95,17 @@ subroutine calcnv(isph,pot,sigma,basloc,dbsloc,vplm,vcos,vsin)
   real*8, intent(inout) :: basloc(nylm), dbsloc(3,nylm), vplm(nylm), &
     & vcos(lmax + 1), vsin(lmax + 1), pot(ngrid)
   integer :: its, jsph, ij, l1, m1, ind, icomp, jcomp
-  real*8 :: fac1, fac2, fac3, wij, vvij, tij, tt, res
-  real*8 :: vij(3), sij(3), j(3,3), sg(3)
+  real*8 :: fac1, fac2, fac3, fac4, wij, vvij, tij, tt, res
+  real*8 :: vij(3), sij(3), j(3,3), sg(3), c(3)
 
   pot = zero
   do its = 1, ngrid
+    c = csph(:,isph) + rsph(isph)*grid(:,its)
     if (ui(its,isph).lt.one) then
-      do ij = inl(isph),inl(isph+1)-1
+      do ij = inl(isph), inl(isph+1) - 1
         jsph = nl(ij)
         ! compute geometrical variables
-        vij = csph(:,isph) + rsph(isph)*grid(:,its) - csph(:,jsph)
+        vij = c - csph(:,jsph)
         vvij = sqrt(dot_product(vij,vij))
         tij = vvij/rsph(jsph)
         res = zero
@@ -99,32 +118,30 @@ subroutine calcnv(isph,pot,sigma,basloc,dbsloc,vplm,vcos,vsin)
           end if 
           ! assemble local basis and gradient
           call dbasis(sij,basloc,dbsloc,vplm,vcos,vsin)
-          ! build the jacobian Ji (sij) 
-          j = zero 
-          j(1,1) = one
-          j(2,2) = one
-          j(3,3) = one
-          do icomp = 1, 3 
-            do jcomp = 1, 3
-              j(icomp,jcomp) = (j(icomp,jcomp) - &
-                & sij(icomp)*sij(jcomp))/vvij
-            end do
-          end do
-          ! TODO: build directly the vector
-          sg(1) = grid(1,its)*j(1,1) + grid(2,its)*j(2,1) + grid(3,its)*j(3,1) 
-          sg(2) = grid(1,its)*j(1,2) + grid(2,its)*j(2,2) + grid(3,its)*j(3,2) 
-          sg(3) = grid(1,its)*j(1,3) + grid(2,its)*j(2,3) + grid(3,its)*j(3,3) 
-          ! assemble the rhs contraction
+
+          ! compute the jacobian
+          sg(1) = + grid(1,its)*(one - sij(1)*sij(1)) & 
+              &   - grid(2,its)*sij(2)*sij(1) &
+              &   - grid(3,its)*sij(3)*sij(1)
+
+          sg(2) = - grid(1,its)*sij(1)*sij(2) &
+              &   + grid(2,its)*(one - sij(2)*sij(2)) &
+              &   - grid(3,its)*sij(3)*sij(2)
+
+          sg(3) = - grid(1,its)*sij(1)*sij(3) & 
+              &   - grid(2,its)*sij(2)*sij(3) &
+              &   + grid(3,its)*(one - sij(3)*sij(3))
+          sg = sg/vvij
+
+          fac4 = dot_product(sij,grid(:,its))/(p*rsph(jsph)*tij)
+
           tt = one
           do l1 = 0, lmax
             fac1 = tt/(two*dble(l1) + one)
-            fac2 = fac1*(dble(l1)/(p*rsph(jsph)*tij)* &
-              & (sij(1)*grid(1,its) + sij(2)*grid(2,its) + &
-              & sij(3)*grid(3,its)) + one)
+            fac2 = fac1*(dble(l1)*fac4 + one)
             ind = l1*l1 + l1 + 1
             do m1 = -l1, l1
-              fac3 = fac1*(sg(1)*dbsloc(1,ind+m1) + & 
-                & sg(2)*dbsloc(2,ind+m1) + sg(3)*dbsloc(3,ind+m1))/p
+              fac3 = fac1*dot_product(sg,dbsloc(:,ind+m1))/p
               res = res + sigma(ind + m1,jsph)*(fac2*basloc(ind+m1) + &
                 & fac3)
             end do
