@@ -1,6 +1,6 @@
-5                ! print flag. the larger, the more verbose the output
+0                ! print flag. the larger, the more verbose the output
 1                ! number of OpenMP cores to be used
-10                ! maximum angular momentum for the spherical harmonics expansion
+10               ! maximum angular momentum for the spherical harmonics expansion
 302              ! (approximate) number of grid points to be used for numerical quadratures
 8                ! convergence threshold for the iterative solver (in this case, 10^-6)
 0                ! whether to compute (1) or not (0) the forces
