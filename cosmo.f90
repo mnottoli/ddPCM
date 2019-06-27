@@ -148,12 +148,12 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
 !         action of  offdiag :  lx
 !
           call jacobi_diis( nsph*nylm, iprint, ndiis, 4, tol, rhs, sigma, n_iter, ok, lx, ldm1x, hnorm )
-          write(6,*) n_iter
 !
 !       4. SOLVATION ENERGY
 !       -------------------
 !
         esolv = pt5 * ((eps - one)/eps) * sprod( nsph*nylm, sigma, psi )
+        write(6,*) n_iter, esolv
 !
 !       deallocate workspace
         deallocate( rhs , stat=istatus )
@@ -203,7 +203,7 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
       call system_clock(count=c2)
 !
 !     printing
-      if ( iprint.gt.0 ) then
+      if ( iprint.ge.0 ) then
 !              
         write(iout,*)
 !        

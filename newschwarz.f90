@@ -32,7 +32,7 @@ subroutine nddcosmo(phi,psi,esolv)
   deallocate(scr)
 
 
-  do i = 1, 20
+  do i = 1, 4
   p = dble(i)*0.1d0
   ! assemble and store the preconditioner
   call system_clock(count=c1)
@@ -53,9 +53,8 @@ subroutine nddcosmo(phi,psi,esolv)
 
   ! compute the energy
   esolv = pt5*((eps - one)/eps)*sprod(nsph*nylm,x,psi)
-  write(6,*) p, n_iter, dble(c2-c1)/dble(cr), dble(c2-c1)/dble(cr), esolv
+  write(6,'(F4.2,I5,3F15.8)') p, n_iter, dble(c3-c2)/dble(cr), dble(c2-c1)/dble(cr), esolv
   end do
-  stop
   return
 end subroutine nddcosmo 
 
@@ -77,6 +76,8 @@ subroutine nlx(n,x,y)
     stop
   end if
 
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph,pot,basloc,dbsloc,vplm,vcos,vsin)
   do isph = 1, nsph
     call calcnv(isph,pot,x,basloc,dbsloc,vplm,vcos,vsin)
     call intrhs(isph,pot,y(:,isph))
@@ -163,6 +164,8 @@ subroutine apply_nlprec(n,x,y)
   real*8, intent(inout) :: y(nylm,nsph)
   integer :: isph
   ! simply do a matrix-vector product with the stored preconditioner 
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph)
   do isph = 1, nsph
     call dgemm('n','n',nylm,1,nylm,one,nlprec(:,:,isph),nylm, &
       & x(:,isph),nylm,zero,y(:,isph),nylm)
@@ -190,6 +193,8 @@ subroutine build_nlprec()
   allocate(ipiv(nylm),work(nylm),stat=istatus)
 
   ! dense contribution 
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph,its,l1,m1,ind,lm,fac1,fac2,fac3)
   do isph = 1, nsph
     fac1 = four*pi/(p*rsph(isph))
     do its = 1, ngrid
@@ -210,6 +215,8 @@ subroutine build_nlprec()
   end do
   
   ! diagonal contribution
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph,l1,m1,ind,fac1)
   do isph = 1, nsph
     do l1 = 0, lmax
       fac1 = four*pi/(two*dble(l1) + one)
@@ -220,12 +227,16 @@ subroutine build_nlprec()
       end do
     end do 
   end do
+  !$omp barrier
 
   ! write(8,*) '#', nylm, 1
   ! call printmatrix(8,nlprec(:,:,1),nylm,nylm)
+  ! debug
+  ! nlprec_bk = nlprec
 
   ! invert 
-  nlprec_bk = nlprec
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph,ipiv,work,istatus)
   do isph = 1, nsph
     call dgetrf(nylm,nylm,nlprec(:,:,isph),nylm,ipiv,istatus)
     if (istatus.ne.0) then
