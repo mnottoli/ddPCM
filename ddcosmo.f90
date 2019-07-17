@@ -130,7 +130,6 @@ implicit none
       real*8, allocatable :: SI_ri(:,:), DI_ri(:,:), SK_ri(:,:),&
 &                            DK_ri(:,:), termimat(:,:)
       real*8  :: kappa, rp, tol_gmres, n_iter_gmres
-      integer, allocatable :: iep_lpb(:), ep_lpb(:)
 !     just hardcode these guys
       integer, parameter :: lmax0 = 6
       integer, parameter :: nbasis0 = 49
@@ -439,9 +438,6 @@ subroutine ddinit(n,x,y,z,rvdw)
 !     initialize number of cavity points
       ncav=0
 
-      ! index of exposed grid point 
-      allocate (iep_lpb(nsph+1))
-      iep_lpb = 1
 !      
 !     loop over spheres
       do isph = 1,nsph
@@ -469,7 +465,6 @@ subroutine ddinit(n,x,y,z,rvdw)
 !
 !     initialize cavity array index
       ii = 0
-      allocate (ep_lpb(ncav))
 !
 !     loop over spheres
       do isph = 1,nsph
@@ -485,7 +480,6 @@ subroutine ddinit(n,x,y,z,rvdw)
 !
 !           store point
             ccav(:,ii) = csph(:,isph) + rsph(isph)*grid(:,i)
-            ep_lpb(ii) = i
 !            
           endif
         enddo
@@ -1946,6 +1940,6 @@ subroutine wghpot_f( gradphi, f )
       end do 
       deallocate( vplm, basloc, vcos, vsin, SK_rijn, DK_rijn  )
       return
-endsubroutine wghpot_f
-!
-endmodule ddcosmo
+end subroutine wghpot_f
+
+end module ddcosmo

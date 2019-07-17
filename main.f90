@@ -1,5 +1,6 @@
 program main
 use ddcosmo
+use ddlpb_lib
 implicit none
 !
 integer :: i, ii, isph, ig, n
