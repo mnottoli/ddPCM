@@ -4,9 +4,12 @@ implicit none
 logical :: firstiniter, firstoutiter, firstcosmo, firsthsp
 logical :: do_diag
 integer :: matAB
+! just hardcode these guys
+integer, parameter :: lmax0 = 6
+integer, parameter :: nbasis0 = 110 
+real*8, parameter :: epsp = 1.0d0
 
 contains
-
 
 subroutine ddlpb(phi,psi,gradphi,sigma,esolv)
   ! main ddlpb
@@ -17,7 +20,7 @@ subroutine ddlpb(phi,psi,gradphi,sigma,esolv)
   real*8, intent(inout) :: sigma(nylm,nsph)
   real*8, intent(in) :: phi(ncav), gradphi(3,ncav)
   real*8, intent(in) :: psi(nylm,nsph)
-  real*8, allocatable :: xr(:,:), xe(:,:), rhs_1(:,:), rhs_2(:,:)
+  real*8, allocatable :: xr(:,:), xe(:,:), rhs_r(:,:), rhs_e(:,:)
   real*8, allocatable :: g(:,:), f(:,:), g0(:), f0(:)
   integer :: isph
   integer :: i
@@ -25,55 +28,78 @@ subroutine ddlpb(phi,psi,gradphi,sigma,esolv)
   logical :: ok = .false.
   real*8 :: tol
   integer :: n_iter
+  integer :: its
+
   allocate(g(ngrid,nsph),f(ngrid,nsph))
   allocate(g0(nylm),f0(nylm))
-  allocate(rhs_1(nylm,nsph),rhs_2(nylm,nsph))
+  allocate(rhs_r(nylm,nsph),rhs_e(nylm,nsph))
   allocate(xr(nylm,nsph),xe(nylm,nsph))
+
+  !do i = 1, ncav
+  !  write(6,'(3F15.8)') phi(i), gradphi(:,i)
+  !end do
+  !stop
 
   ! Build the right hand side
   call wghpot(phi,g)
   ! TODO: optimize wghpot_f
   call wghpot_f(gradphi,f)
+  do isph = 1, nsph 
+    do its = 1, ngrid
+      write(6,'(2F16.8)') g(its,isph), f(its,isph)
+    end do
+  end do
+  stop
   
   do isph = 1, nsph
     call intrhs(isph,g(:,isph),g0)
     call intrhs(isph,f(:,isph),f0)
-    rhs_1(:,isph) = g0 + f0
-    rhs_2(:,isph) = f0
+    ! rhs 
+    rhs_r(:,isph) = g0 + f0
+    rhs_e(:,isph) = f0
   end do
 
   write(6,*) '#########'
   do isph = 1, nsph
     do i = 1, nylm
-      write(6,'(2F15.8)') rhs_1(i,isph), rhs_2(i,isph)
+      write(6,'(2F15.8)') rhs_r(i,isph), rhs_e(i,isph)
     end do
   end do
+  stop
 
   tol = 10.0d0**(-iconv)
+  ! TODO: remove this 
   firstcosmo = .true.
   firsthsp = .true.
   firstiniter = .true.
   firstoutiter = .true.
 
   do while (.not.converged)
+
     ! solve the ddcosmo step
-    ! AXr = RHSr
+    ! A X_r = RHS_r 
+
     !call print_ddvector('rhs',rhs_1)
     n_iter = 200
-    call jacobi_diis(nsph*nylm,iprint,ndiis,4,tol,rhs_1,xr,n_iter,&
+    call jacobi_diis(nsph*nylm,iprint,ndiis,4,tol,rhs_r,xr,n_iter,&
       & ok,lx,ldm1x,hnorm)
     call convert_ddcosmo(1,xr)
     !call print_ddvector('xr',xr)
   
     ! solve ddlpb step
-    ! BXe = RHSe
-    call lpb_hsp(rhs_2,xe)
+    ! B X_e = RHS_e
+
+    call lpb_hsp(rhs_e,xe)
     call print_ddvector('xe',xe)
   
     ! update the RHS
-    ! call update_rhs(f0 + g0,f0,rhs_1,rhs_2,xr,xe)
-    call print_ddvector('rhs_1',rhs_1)
-    call print_ddvector('rhs_2',rhs_2)
+    ! / RHS_r \ = / g0 + f0 \ - / c1 c2 \ / X_r \
+    ! \ RHS_e /   \ f0      /   \ c1 c2 / \ X_e /
+
+    ! call update_rhs(f0 + g0,f0,rhs_r,rhs_e,xr,xe)
+    write(6,*) 'after update RHS'
+    call print_ddvector('rhs_r',rhs_r)
+    call print_ddvector('rhs_e',rhs_e)
      
     stop
     ! check for convergency
@@ -85,6 +111,113 @@ subroutine ddlpb(phi,psi,gradphi,sigma,esolv)
   write(6,*) 'Done'
   return
 end subroutine ddlpb
+
+subroutine wghpot_f( gradphi, f )
+!
+      use bessel
+      implicit none
+!
+      real*8, dimension(3, ncav),       intent(in)  :: gradphi
+      real*8, dimension(ngrid,nsph), intent(out) :: f
+!
+      integer :: isph, ig, ic, ind, ind0, jg, l, m, jsph
+      real*8 :: nderphi, sumSijn, rijn, coef_Ylm, sumSijn_pre, termi, termk, term
+      real*8, dimension(3) :: sijn, vij
+      real*8, allocatable :: SK_rijn(:), DK_rijn(:)
+
+      integer :: l0, m0, NM, kep, istatus
+      real*8, dimension(nylm, nsph) :: c0
+      real*8, dimension(0:lmax, nsph) :: coef_bessel
+      real*8, allocatable :: vplm(:), basloc(:), vcos(:), vsin(:)
+      
+      allocate( vplm(nylm), basloc(nylm), vcos(lmax+1), vsin(lmax+1) )
+!
+!------------------------------------------------------------------------------------------------
+!
+!     initialize
+      ic = 0 ; f(:,:)=0.d0
+      allocate( SK_rijn(0:lmax0), DK_rijn(0:lmax0) )
+
+!     compute c0
+      do isph = 1, nsph
+        do ig = 1, ngrid
+          if ( ui(ig,isph).ne.zero ) then
+            ic = ic + 1
+            nderphi = dot_product( gradphi(:,ic), grid(:,ig) )
+            c0(:, isph) = c0(:,isph) + w(ig)*ui(ig,isph)*nderphi*basis(:,ig)
+          end if
+        end do
+      end do
+
+      allocate (coefY(ncav, nbasis0,nsph), stat = istatus )
+!     memuse = memuse + ncav*nbasis0*nsph
+!     memmax = max(memmax,memuse)
+        
+      if ( istatus .ne. 0 ) then
+          write(*,*)'wghpot_f : [1] allocation failed!'
+          stop
+      end if
+
+!    compute coef_bessel  
+      do jsph = 1, nsph
+        do l0 = 0, lmax0
+          if ( max(DI_ri(l0,jsph), SI_ri(l0,jsph)) .gt. tol_inf) then
+            termi = kappa
+          else if ( min(DI_ri(l0,jsph), SI_ri(l0,jsph)) .lt. tol_zero) then
+            termi = l0/rsph(jsph)+ (l0+1)*(kappa**2*rsph(jsph))/( (2*l0+1)*(2*l0+3) )
+          else
+            termi = DI_ri(l0,jsph)/SI_ri(l0,jsph)*kappa
+          end if
+          !write(*,*) SI_ri(l0,jsph), termi
+          if ( SK_ri(l0,jsph).gt. tol_inf) then
+            termk = -(l0+1)/rsph(jsph) - l0*(kappa**2*rsph(jsph))/( (2*l0-1)*(2*l0+1) )
+          else if ( SK_ri(l0,jsph).lt. tol_zero) then
+            termk = -kappa
+          else
+            termk = DK_ri(l0,jsph)/SK_ri(l0,jsph) *kappa
+          end if
+          !write(*,*) SK_ri(l0,jsph), termk
+          coef_bessel(l0,jsph) = 1/( termi-termk)
+          !write(*,*) DI_ri(l0,jsph), SI_ri(l0,jsph), coef_bessel(l0,jsph)
+          !write(*,*) ( min(-DK_ri(l0,jsph), SK_ri(l0,jsph)) .lt. tol_zero), DK_ri(l0,jsph), termk
+        end do
+      end do
+!
+      do isph = 1, nsph
+        do ig = 1, ngrid
+          if (ui(ig,isph).ne.zero) then
+            sumSijn = zero
+            do jsph = 1, nsph
+              sumSijn_pre = sumSijn
+              vij  = csph(:,isph) + rsph(isph)*grid(:,ig) - csph(:,jsph)
+              rijn = sqrt( dot_product( vij, vij ) )
+              sijn = vij/rijn
+              
+              call SPHK_bessel( lmax0, rijn*kappa, NM, SK_rijn, DK_rijn )
+              call ylmbas( sijn, basloc, vplm, vcos, vsin )
+              do l0 = 0,lmax0
+                if (SK_ri(l0,jsph).gt. tol_inf) then
+                  term = ( rsph(jsph)/rijn )**(l0+1)
+                else if (SK_ri(l0,jsph).lt. tol_zero) then
+                  term = ( rsph(jsph)/rijn )*exp(-kappa*(rijn-rsph(jsph)))
+                else
+                  term = SK_rijn(l0)/SK_ri(l0,jsph)
+                end if
+                coef_Ylm =  coef_bessel(l0,jsph)*term
+                do m0 = -l0, l0
+                  ind0 = l0**2+l0+m0+1
+                  sumSijn = sumSijn + c0(ind0, jsph)*coef_Ylm* basloc(ind0)
+                  coefY(kep,ind0,jsph) = coef_Ylm* basloc(ind0)
+                end do
+              end do
+            end do
+            f(ig,isph) = -(epsp/eps)*ui(ig,isph) * sumSijn
+          end if
+        end do
+      end do 
+      deallocate( vplm, basloc, vcos, vsin, SK_rijn, DK_rijn  )
+      return
+end subroutine wghpot_f
 
 subroutine matabx( n, x, y )
 !      
