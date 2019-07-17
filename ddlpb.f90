@@ -71,7 +71,7 @@ subroutine ddlpb(phi,psi,gradphi,sigma,esolv)
     call print_ddvector('xe',xe)
   
     ! update the RHS
-    call update_rhs(f0 + g0,f0,rhs_1,rhs_2,xr,xe)
+    ! call update_rhs(f0 + g0,f0,rhs_1,rhs_2,xr,xe)
     call print_ddvector('rhs_1',rhs_1)
     call print_ddvector('rhs_2',rhs_2)
      
@@ -302,199 +302,198 @@ subroutine intcosmo(tij, basloc, fac_cosmo)
       end do
 endsubroutine intcosmo
 
-subroutine update_rhs( rhs_cosmo_init, rhs_hsp_init, rhs_cosmo, rhs_hsp, Xr, Xe)
-      use ddcosmo
-      use bessel
-      implicit none
-      real*8, dimension(nylm,nsph), intent(in) :: rhs_cosmo_init, rhs_hsp_init
-      real*8, dimension(nylm,nsph), intent(inout) :: rhs_cosmo, rhs_hsp
-      real*8, dimension(nylm,nsph) :: rhs_plus
-      real*8, dimension(nylm,nsph), intent(in) :: Xr, Xe
-      integer :: isph, jsph, ig, kep, ind, l1,m1, ind1, ind0, count, istatus
-      real*8, dimension(3) :: vij
-      real*8, dimension(nylm,nsph) :: diff_re
-      real*8, dimension(nbasis0,nsph) :: diff0
-      real*8, dimension(nylm,nylm,nsph) :: smat
-      real*8, dimension(ncav) :: diff_ep
-      real*8 :: Qval, rijn, val
-      integer :: c0, cr, c_qmat, c_init, c_ep0, c_ep1!nbasis_appro
-      
-!       real*8 :: dist_far
-!       integer :: nbasis_far
-!       logical :: use_appro
-!       
-!       dist_far = 64
-!       nbasis_far = 1
-!       use_appro = .false.
-      
-      if (firstoutiter) then
-            allocate( coefvec(ngrid, nbasis, nsph), Pchi(nbasis,nbasis0,nsph), stat = istatus)
-            memuse = memuse + ngrid*nbasis*nsph + nbasis*nbasis0*nsph
-            memmax = max(memmax,memuse)
-            if ( istatus .ne. 0 ) then
-                write(*,*)'update_rhs : [1] allocation failed!'
-                stop
-            end if
-       end if
-
-      call system_clock(count_rate=cr)
-      call system_clock(count=c0)
-      
-!     compute P_chi matrix
-      if (firstoutiter) then      
-          do jsph = 1, nsph
-            call mkpmat( jsph, Pchi(:,:,jsph) )
-          end do    
-      end if 
-      
-!     compute Qmat, if Chi_e is zero, set Qmat to 0
-!      if (firstoutiter) then  
-!         !$omp parallel do default(shared) private(isph,kep,jsph,ind,ind0,Qval, Qmat)
-!         do isph = 1,nsph
-!             ! not buried
-!             if ( (iep(isph+1)-iep(isph)) .gt. 0 ) then 
-!                 ! loop over exposed grid points
-!                 do kep = iep(isph), iep(isph+1)-1 
-!                     ig = ep(kep) ! kep represents (isph, ig)
-!                     do jsph = 1,nsph
-!                         if ( (iep(jsph+1)-iep(jsph)) .gt. 0 ) then
-!                             vij = csph(:,isph)-csph(:,jsph)
-!                             if ( ((dot_product(vij,vij)) .gt. dist_far) .and. (use_appro) ) then ! far way atom pair 
-!                                 ! like fast multipole method 
-!                                 nbasis_appro  = nbasis_far 
-!                             else 
-!                                 nbasis_appro = nbasis
-!                             end if 
-!                             do ind1 = 1, nbasis_appro ! ind0 = 1,  zero contribution!
-!                                 Qmat(kep, ind1, jsph) = dot_product( Pchi(ind1,:, jsph), coefY(kep,:,jsph) )
-!                             end do
-!                         end if
-!                     end do
-!                 end do
-!             end if
-!         end do
-!         !$omp end parallel do
-!        
-!        ! save Qmat        
-!         open (unit=100,file="Qmat.txt",action="write",status="replace")
-!         do kep = 1, ncav
-!               write (100,'(*(f10.6))') Qmat(kep,:,:)
-!         end do
-!         close (100)
+!subroutine update_rhs( rhs_cosmo_init, rhs_hsp_init, rhs_cosmo, rhs_hsp, Xr, Xe)
+!      use ddcosmo
+!      use bessel
+!      implicit none
+!      real*8, dimension(nylm,nsph), intent(in) :: rhs_cosmo_init, rhs_hsp_init
+!      real*8, dimension(nylm,nsph), intent(inout) :: rhs_cosmo, rhs_hsp
+!      real*8, dimension(nylm,nsph) :: rhs_plus
+!      real*8, dimension(nylm,nsph), intent(in) :: Xr, Xe
+!      integer :: isph, jsph, ig, kep, ind, l1,m1, ind1, ind0, count, istatus
+!      real*8, dimension(3) :: vij
+!      real*8, dimension(nylm,nsph) :: diff_re
+!      real*8, dimension(nbasis0,nsph) :: diff0
+!      real*8, dimension(nylm,nylm,nsph) :: smat
+!      real*8, dimension(ncav) :: diff_ep
+!      real*8 :: Qval, rijn, val
+!      integer :: c0, cr, c_qmat, c_init, c_ep0, c_ep1!nbasis_appro
+!      
+!!       real*8 :: dist_far
+!!       integer :: nbasis_far
+!!       logical :: use_appro
+!!       
+!!       dist_far = 64
+!!       nbasis_far = 1
+!!       use_appro = .false.
+!      
+!      if (firstoutiter) then
+!            allocate( coefvec(ngrid, nbasis, nsph), Pchi(nbasis,nbasis0,nsph), stat = istatus)
+!            memuse = memuse + ngrid*nbasis*nsph + nbasis*nbasis0*nsph
+!            memmax = max(memmax,memuse)
+!            if ( istatus .ne. 0 ) then
+!                write(*,*)'update_rhs : [1] allocation failed!'
+!                stop
+!            end if
+!       end if
 !
+!      call system_clock(count_rate=cr)
+!      call system_clock(count=c0)
+!      
+!!     compute P_chi matrix
+!      if (firstoutiter) then      
+!          do jsph = 1, nsph
+!            call mkpmat( jsph, Pchi(:,:,jsph) )
+!          end do    
+!      end if 
+!      
+!!     compute Qmat, if Chi_e is zero, set Qmat to 0
+!!      if (firstoutiter) then  
+!!         !$omp parallel do default(shared) private(isph,kep,jsph,ind,ind0,Qval, Qmat)
+!!         do isph = 1,nsph
+!!             ! not buried
+!!             if ( (iep(isph+1)-iep(isph)) .gt. 0 ) then 
+!!                 ! loop over exposed grid points
+!!                 do kep = iep(isph), iep(isph+1)-1 
+!!                     ig = ep(kep) ! kep represents (isph, ig)
+!!                     do jsph = 1,nsph
+!!                         if ( (iep(jsph+1)-iep(jsph)) .gt. 0 ) then
+!!                             vij = csph(:,isph)-csph(:,jsph)
+!!                             if ( ((dot_product(vij,vij)) .gt. dist_far) .and. (use_appro) ) then ! far way atom pair 
+!!                                 ! like fast multipole method 
+!!                                 nbasis_appro  = nbasis_far 
+!!                             else 
+!!                                 nbasis_appro = nbasis
+!!                             end if 
+!!                             do ind1 = 1, nbasis_appro ! ind0 = 1,  zero contribution!
+!!                                 Qmat(kep, ind1, jsph) = dot_product( Pchi(ind1,:, jsph), coefY(kep,:,jsph) )
+!!                             end do
+!!                         end if
+!!                     end do
+!!                 end do
+!!             end if
+!!         end do
+!!         !$omp end parallel do
+!!        
+!!        ! save Qmat        
+!!         open (unit=100,file="Qmat.txt",action="write",status="replace")
+!!         do kep = 1, ncav
+!!               write (100,'(*(f10.6))') Qmat(kep,:,:)
+!!         end do
+!!         close (100)
+!!
+!!      end if
+!
+!!     precompute coefvec of Qmat, Cost: linear scaling
+!      if (firstoutiter) then 
+!        do isph = 1,nsph
+!            do ig = 1,ngrid
+!                if (ui(ig, isph) .gt. 0) then
+!                    do ind  = 1, nbasis
+!                      coefvec(ig, ind, isph) = w(ig)*ui(ig, isph)*basis(ind,ig)
+!                    end do
+!                end if
+!            end do
+!        end do
 !      end if
-
-!     precompute coefvec of Qmat, Cost: linear scaling
-      if (firstoutiter) then 
-        do isph = 1,nsph
-            do ig = 1,ngrid
-                if (ui(ig, isph) .gt. 0) then
-                    do ind  = 1, nbasis
-                      coefvec(ig, ind, isph) = w(ig)*ui(ig, isph)*basis(ind,ig)
-                    end do
-                end if
-            end do
-        end do
-      end if
-      
-!     precompute termimat      
-      if (firstoutiter) then
-        do jsph = 1,nsph
-            do l1 = 0,lmax
-                ! termi
-                if ( max(DI_ri(l1,jsph), SI_ri(l1,jsph)) .gt. tol_inf) then
-                    termimat(l1,jsph) = kappa
-                else if ( min(DI_ri(l1,jsph), SI_ri(l1,jsph)) .lt. tol_zero) then
-                    termimat(l1,jsph) = l1/rsph(jsph)+ (l1+1)*(kappa**2*rsph(jsph))/( (2*l1+1)*(2*l1+3) )
-                else
-                    termimat(l1,jsph) = DI_ri(l1,jsph)/SI_ri(l1,jsph)*kappa
-                end if
-            end do
-        end do
-      end if
-      
-      if (firstoutiter) then
-        call system_clock(count=c_init)
-        if (iprint .gt. 0) then  
-            write(*,999) dble(c_init-c0)/dble(cr)
- 999     format('Time of initializing Pchi, coefvec, termi: ',f8.3,' secs.')   
-        end if
-      end if
-      
-      ! diff_re = eps1/eps2*l1/ri*Xr - i'(ri)/i(ri)*Xe,
-      diff_re = 0
-      do jsph = 1,nsph
-        do l1 = 0,lmax
-            do m1 = -l1,l1
-                ind1 = l1**2+l1+m1+1
-                diff_re(ind1,jsph) = ( eps1/eps2*l1/rsph(jsph)*Xr(ind1,jsph) - termimat(l1,jsph)*Xe(ind1,jsph) )
-             end do
-        end do
-      end do
-      
-      ! diff0 = Pchi * diff_er, linear scaling
-      diff0 = 0
-      do jsph = 1,nsph
-          do ind0 = 1,nbasis0
-            diff0(ind0, jsph) = dot_product(diff_re(:,jsph), Pchi(:,ind0, jsph))
-          end do
-      end do
-      
-      ! diff_ep = diff0 * coefY,    COST: M^2*nbasis*Nleb
-      call system_clock(count=c_ep0)
-      diff_ep = 0
-      do kep = 1,ncav
-        val = 0
-        do jsph = 1,nsph
-            do ind0 = 1,nbasis0
-            val = val + diff0(ind0,jsph)*coefY(kep,ind0,jsph)
-            end do
-        end do
-        diff_ep(kep) = val !sum( diff0(:,:)*coefY(kep,:,:) ) ! of dimesion (nbasis0, nsph) , accelaration?
-      end do
-      call system_clock(count=c_ep1)
-      
-      write(*,1000) dble(c_ep1-c_ep0)/dble(cr)
- 1000     format('Time of updating diff_ep: ',f8.3,' secs.')   
- 
-!           ! Save coefY
-!         open (unit=100,file="coefY.txt",action="write",status="replace")
-!         do kep = 1, ncav
-!               write (100,'(*(f10.6))') coefY(kep,:,:)
-!         end do
-!         close (100)
-!         stop
-              
-!     diff_ep = 0
-!       do kep = 1,ncav
-!           do jsph = 1,nsph
-!             do ind1 = 1,nbasis
-!                 diff_ep(kep) = diff_ep(kep) + diff_re(ind1,jsph)*Qmat(kep,ind1,jsph)
+!      
+!!     precompute termimat      
+!      if (firstoutiter) then
+!        do jsph = 1,nsph
+!            do l1 = 0,lmax
+!                ! termi
+!                if ( max(DI_ri(l1,jsph), SI_ri(l1,jsph)) .gt. tol_inf) then
+!                    termimat(l1,jsph) = kappa
+!                else if ( min(DI_ri(l1,jsph), SI_ri(l1,jsph)) .lt. tol_zero) then
+!                    termimat(l1,jsph) = l1/rsph(jsph)+ (l1+1)*(kappa**2*rsph(jsph))/( (2*l1+1)*(2*l1+3) )
+!                else
+!                    termimat(l1,jsph) = DI_ri(l1,jsph)/SI_ri(l1,jsph)*kappa
+!                end if
+!            end do
+!        end do
+!      end if
+!      
+!      if (firstoutiter) then
+!        call system_clock(count=c_init)
+!        if (iprint .gt. 0) then  
+!            write(*,999) dble(c_init-c0)/dble(cr)
+! 999     format('Time of initializing Pchi, coefvec, termi: ',f8.3,' secs.')   
+!        end if
+!      end if
+!      
+!      ! diff_re = eps1/eps2*l1/ri*Xr - i'(ri)/i(ri)*Xe,
+!      diff_re = 0
+!      do jsph = 1,nsph
+!        do l1 = 0,lmax
+!            do m1 = -l1,l1
+!                ind1 = l1**2+l1+m1+1
+!                diff_re(ind1,jsph) = ( eps1/eps2*l1/rsph(jsph)*Xr(ind1,jsph) - termimat(l1,jsph)*Xe(ind1,jsph) )
 !             end do
-!           end do
-!       end do
-      
-!write(*,*) 'diff ', diff_re(1,1), Xe(1,1)
-          
-!     compute rhs_plus = - C1 Xr - C2 Xe,   COST: linear scaling M*nbasis*Nleb
-      rhs_plus = 0
-      do isph = 1,nsph
-         if ( (iep(isph+1)-iep(isph)) .gt. 0 ) then ! not buried
-            do ind = 1,nbasis
-                do kep = iep(isph), iep(isph+1)-1
-                    ig = ep(kep) 
-                    rhs_plus(ind,isph) = rhs_plus(ind,isph) + coefvec(ig, ind, isph)*diff_ep(kep)
-                end do
-            end do
-         end if
-      end do
-      
-!     update rhs_cosmo, rhs_hsp
-      rhs_cosmo = rhs_cosmo_init - rhs_plus
-      rhs_hsp      = rhs_hsp_init - rhs_plus 
-      
-      
-endsubroutine update_rhs  
+!        end do
+!      end do
+!      
+!      ! diff0 = Pchi * diff_er, linear scaling
+!      diff0 = 0
+!      do jsph = 1,nsph
+!          do ind0 = 1,nbasis0
+!            diff0(ind0, jsph) = dot_product(diff_re(:,jsph), Pchi(:,ind0, jsph))
+!          end do
+!      end do
+!      
+!      ! diff_ep = diff0 * coefY,    COST: M^2*nbasis*Nleb
+!      call system_clock(count=c_ep0)
+!      diff_ep = 0
+!      do kep = 1,ncav
+!        val = 0
+!        do jsph = 1,nsph
+!            do ind0 = 1,nbasis0
+!            val = val + diff0(ind0,jsph)*coefY(kep,ind0,jsph)
+!            end do
+!        end do
+!        diff_ep(kep) = val !sum( diff0(:,:)*coefY(kep,:,:) ) ! of dimesion (nbasis0, nsph) , accelaration?
+!      end do
+!      call system_clock(count=c_ep1)
+!      
+!      write(*,1000) dble(c_ep1-c_ep0)/dble(cr)
+! 1000     format('Time of updating diff_ep: ',f8.3,' secs.')   
+! 
+!!           ! Save coefY
+!!         open (unit=100,file="coefY.txt",action="write",status="replace")
+!!         do kep = 1, ncav
+!!               write (100,'(*(f10.6))') coefY(kep,:,:)
+!!         end do
+!!         close (100)
+!!         stop
+!              
+!!     diff_ep = 0
+!!       do kep = 1,ncav
+!!           do jsph = 1,nsph
+!!             do ind1 = 1,nbasis
+!!                 diff_ep(kep) = diff_ep(kep) + diff_re(ind1,jsph)*Qmat(kep,ind1,jsph)
+!!             end do
+!!           end do
+!!       end do
+!      
+!!write(*,*) 'diff ', diff_re(1,1), Xe(1,1)
+!          
+!!     compute rhs_plus = - C1 Xr - C2 Xe,   COST: linear scaling M*nbasis*Nleb
+!      rhs_plus = 0
+!      do isph = 1,nsph
+!         if ( (iep(isph+1)-iep(isph)) .gt. 0 ) then ! not buried
+!            do ind = 1,nbasis
+!                do kep = iep(isph), iep(isph+1)-1
+!                    ig = ep(kep) 
+!                    rhs_plus(ind,isph) = rhs_plus(ind,isph) + coefvec(ig, ind, isph)*diff_ep(kep)
+!                end do
+!            end do
+!         end if
+!      end do
+!      
+!!     update rhs_cosmo, rhs_hsp
+!      rhs_cosmo = rhs_cosmo_init - rhs_plus
+!      rhs_hsp      = rhs_hsp_init - rhs_plus 
+!
+!endsubroutine update_rhs  
 
 
 
