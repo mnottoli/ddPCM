@@ -54,9 +54,18 @@ contains
   !stop
 
   ! Build the right hand side
+  ! do i = 1, ncav
+  !   write(6,'(4F20.10)') phi(i), gradphi(:,i)
+  ! end do
+
   call wghpot(phi,g)
-  ! TODO: optimize wghpot_f
   call wghpot_f(gradphi,f)
+
+  ! do isph = 1, nsph
+  !   do i = 1, ngrid
+  !     write(6,'(2F20.10)') g(i,isph), f(i,isph)
+  !   end do
+  ! end do
   
   do isph = 1, nsph
     call intrhs(isph,g(:,isph),g0)
@@ -65,6 +74,7 @@ contains
     rhs_r_init(:,isph) = g0 + f0
     rhs_e_init(:,isph) = f0
   end do
+
   rhs_r = rhs_r_init
   rhs_e = rhs_e_init
 
@@ -81,10 +91,9 @@ contains
     ! solve the ddcosmo step
     ! A X_r = RHS_r 
     n_iter = 200
-    ! call print_ddvector('rhs_r',rhs_r)
     call jacobi_diis(nsph*nylm,iprint,ndiis,4,tol,rhs_r,xr,n_iter,&
       & ok,lx,ldm1x,hnorm)
-    ! call convert_ddcosmo(1,xr)
+    call convert_ddcosmo(1,xr)
     ! call print_ddvector('xr',xr)
   
     ! solve ddlpb step
@@ -100,7 +109,7 @@ contains
     ! call print_ddvector('rhs_e',rhs_e)
 
     ! compute energy
-     !esolv = pt5*sprod(nsph*nylm,xr,psi) ???
+    !esolv = pt5*sprod(nsph*nylm,xr,psi) ???
     esolv = zero
     do isph = 1, nsph
       esolv = esolv + pt5*q(isph)*Xr(1,isph)*(one/(two*sqrt(pi)))
@@ -485,7 +494,7 @@ contains
   ! and i have to recover mkpmat 
   if (firstoutiter) then      
     do jsph = 1, nsph
-    call mkpmat(jsph, Pchi(:,:,jsph))
+      call mkpmat(jsph, Pchi(:,:,jsph))
     end do    
   end if 
       
@@ -565,23 +574,21 @@ contains
   end do
 
   rhs_plus = zero
+  kep = 0
   do isph = 1, nsph
-    kep = 0
     do ig = 1, ngrid
       if (ui(ig,isph).gt.zero) then 
         kep = kep + 1
         do ind = 1, nylm
           rhs_plus(ind,isph) = rhs_plus(ind,isph) + &
               & coefvec(ig,ind,isph)*diff_ep(kep)
-          write(6,*) ig, kep, diff_ep(kep)
         end do
       end if
     end do
   end do
 
-  stop
   rhs_cosmo = rhs_cosmo_init - rhs_plus
-  rhs_hsp   = rhs_hsp_init - rhs_plus 
+  rhs_hsp = rhs_hsp_init - rhs_plus 
 
   return
   end subroutine update_rhs  
