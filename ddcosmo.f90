@@ -85,7 +85,8 @@ implicit none
 !     - numerical constants
 !
       integer, parameter :: ndiis=25, iout=6, nngmax=100
-      real*8,  parameter :: zero=0.d0, pt5=0.5d0, one=1.d0, two=2.d0, four=4.d0
+      real*8,  parameter :: zero=0.d0, pt5=0.5d0, one=1.d0, two=2.d0, &
+          & three=3.d0, four=4.d0
       real*8,  parameter :: se = -1.0d0
 !
 !     - numerical constants explicitly computed
@@ -122,16 +123,6 @@ implicit none
       real*8,  allocatable :: fact(:), facl(:), facs(:)
       real*8,  allocatable :: fi(:,:), ui(:,:), zi(:,:,:)
 !
-!     just as they are in Chaoyu's work for ddLPB
-      real*8, allocatable :: wij(:,:), bas_sij(:,:,:),&
-&                            fac_cosmo_ij(:,:,:), fac_hsp_ij(:,:,:)
-      real*8, allocatable :: coefvec(:,:,:), Pchi(:,:,:),&
-&                            Qmat(:,:,:), coefY(:,:,:)
-      real*8, allocatable :: SI_ri(:,:), DI_ri(:,:), SK_ri(:,:),&
-&                            DK_ri(:,:), termimat(:,:)
-      real*8  :: kappa, rp, tol_gmres, n_iter_gmres
-
-!
 !     - miscellanea
 !
       logical :: grad
@@ -167,7 +158,6 @@ implicit none
 !
 !--------------------------------------------------------------------------------------------------
 subroutine ddinit(n,x,y,z,rvdw)
-      use bessel
       implicit none
 !
 !     allocate the various arrays needed for ddcosmo,
@@ -186,8 +176,6 @@ subroutine ddinit(n,x,y,z,rvdw)
       integer, dimension(nllg) :: ng0
       data ng0/6,14,26,38,50,74,86,110,146,170,194,230,266,302,350,434,590,770,974, &
          1202,1454,1730,2030,2354,2702,3074,3470,3890,4334,4802,5294,5810/
-!     ddLPB
-      integer :: NM
 !
 ! openMP parallelization:
 !
@@ -490,21 +478,6 @@ subroutine ddinit(n,x,y,z,rvdw)
         end do
         write(iout,*)
       end if
-!
-!     ddLPB
-!
-      allocate(SI_ri(0:lmax,nsph), DI_ri(0:lmax,nsph), SK_ri(0:lmax,nsph), DK_ri(0:lmax,nsph), &
-&              termimat(0:lmax,nsph), stat=istatus )  
-      if (istatus.ne.0) then
-         write(*,*)'ddinit : [1] allocation failed !'
-         stop
-      end if
-      do isph = 1, nsph
-          call SPHI_bessel (lmax, rsph(isph)*kappa, NM, SI_ri(:,isph), DI_ri(:,isph))
-          call SPHK_bessel (lmax, rsph(isph)*kappa, NM, SK_ri(:,isph), DK_ri(:,isph))
-      end do
-      return
-!
 !
 end subroutine ddinit
 !---------------------------------------------------------------------------------

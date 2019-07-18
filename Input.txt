@@ -2,7 +2,7 @@
 1                ! number of OpenMP cores to be used
 6                ! maximum angular momentum for the spherical harmonics expansion
 110              ! (approximate) number of grid points to be used for numerical quadratures
-10               ! convergence threshold for the iterative solver (in this case, 10^-6)
+10               ! convergence threshold for the iterative solver
 0                ! whether to compute (1) or not (0) the forces
 78.3553          ! dielectric constant
 0.0              ! regularization parameter

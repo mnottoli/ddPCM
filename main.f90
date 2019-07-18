@@ -93,7 +93,7 @@ call mkrhs(n,charge,x,y,z,ncav,ccav,phi,gradphi,nylm,psi)
 !
 allocate (sigma(nylm,n))
 !
-call ddlpb(phi,psi,gradphi,sigma,esolv)
+call ddlpb(phi,charge,psi,gradphi,sigma,esolv)
 !call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 !
 if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)

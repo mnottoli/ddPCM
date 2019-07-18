@@ -8,8 +8,8 @@ FFLAGS = -O3 -march=native -llapack -lblas
 #RunF77 = pgfortran
 #FFLAGS = -O3 -mp
 
-MODS   = bessel.o ddcosmo.o ddlpb.o
-OBJS   = mkrhs.o llgnew.o ddlpb.o ddcosmo.o forces_dd.o efld.o\
+MODS   = bessel.o ddcosmo.o ddlpb_lib.o
+OBJS   = mkrhs.o llgnew.o ddlpb_lib.o ddcosmo.o forces_dd.o efld.o\
 	matvec.o cosmo.o jacobi_diis.o main.o bessel.o gmres.o
 #
 all:    $(MODS) $(OBJS)
