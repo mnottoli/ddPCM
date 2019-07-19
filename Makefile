@@ -4,12 +4,12 @@
 #RunF77 = ifort
 #FFLAGS = -O3 -xHost -qopenmp
 RunF77 = gfortran
-FFLAGS = -O3 -march=native -fopenmp
+FFLAGS = -O3 -march=native -fopenmp -llapack -lblas
 #RunF77 = pgfortran
 #FFLAGS = -O3 -mp
 
-MODS   = ddcosmo.o
-OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o forces_dd.o efld.o\
+MODS   = ddcosmo.o ddpcm_lib.o
+OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o ddpcm_lib.o forces_dd.o efld.o\
 	matvec.o cosmo.o jacobi_diis.o
 #
 all:    $(MODS) $(OBJS)
