@@ -93,13 +93,13 @@
 !
 subroutine lx( n, x, y )
 !
-      use ddcosmo , only : iprint, nylm, nsph, ngrid, lmax, zero, calcv, intrhs, &
+      use ddcosmo , only : iprint, nbasis, nsph, ngrid, lmax, zero, calcv, intrhs, &
                            facl, prtsph
 !      
       implicit none 
       integer,                         intent(in)    :: n
-      real*8,  dimension(nylm,nsph), intent(in)    :: x
-      real*8,  dimension(nylm,nsph), intent(inout) :: y
+      real*8,  dimension(nbasis,nsph), intent(in)    :: x
+      real*8,  dimension(nbasis,nsph), intent(inout) :: y
       !
       integer             :: isph, istatus
       real*8, allocatable :: pot(:), vplm(:), basloc(:), vcos(:), vsin(:)
@@ -107,7 +107,7 @@ subroutine lx( n, x, y )
 !-------------------------------------------------------------------------------
 !
 !     allocate workspaces
-      allocate( pot(ngrid), vplm(nylm), basloc(nylm), vcos(lmax+1), &
+      allocate( pot(ngrid), vplm(nbasis), basloc(nbasis), vcos(lmax+1), &
                 vsin(lmax+1) , stat=istatus )
       if ( istatus.ne.0 ) then
         write(*,*) 'lx: allocation failed !'
@@ -160,13 +160,13 @@ end subroutine lx
 !
 subroutine lstarx( n, x, y )
 !
-      use ddcosmo , only : iprint, nylm, nsph, ngrid, lmax, zero, basis, &
+      use ddcosmo , only : iprint, nbasis, nsph, ngrid, lmax, zero, basis, &
                            adjrhs, facl, prtsph
 !      
       implicit none 
       integer,                       intent(in)    :: n
-      real*8,  dimension(nylm,nsph), intent(in)    :: x
-      real*8,  dimension(nylm,nsph), intent(inout) :: y
+      real*8,  dimension(nbasis,nsph), intent(in)    :: x
+      real*8,  dimension(nbasis,nsph), intent(inout) :: y
 !
       integer             :: isph, ig, istatus
       real*8, allocatable :: xi(:,:), vplm(:), basloc(:), vcos(:), vsin(:)
@@ -174,7 +174,7 @@ subroutine lstarx( n, x, y )
 !-------------------------------------------------------------------------------
 !
 !     allocate workspaces
-      allocate( xi(ngrid,nsph), vplm(nylm), basloc(nylm), vcos(lmax+1), &
+      allocate( xi(ngrid,nsph), vplm(nbasis), basloc(nbasis), vcos(lmax+1), &
                 vsin(lmax+1) , stat=istatus )
       if ( istatus.ne.0 ) then
         write(*,*) 'lstarx: allocation failed!'
@@ -245,13 +245,13 @@ end subroutine lstarx
 !
 subroutine ldm1x( n, x, y )
 !
-      use ddcosmo , only : nylm, nsph, facl
+      use ddcosmo , only : nbasis, nsph, facl
 !      
       implicit none
 !
       integer,                         intent(in)    :: n
-      real*8,  dimension(nylm,nsph), intent(in)    :: x
-      real*8,  dimension(nylm,nsph), intent(inout) :: y
+      real*8,  dimension(nbasis,nsph), intent(in)    :: x
+      real*8,  dimension(nbasis,nsph), intent(inout) :: y
 !
       integer                                        :: isph
 !
@@ -280,11 +280,11 @@ end subroutine ldm1x
 !
 real*8 function hnorm( n, x )
 !
-      use ddcosmo , only : nylm, nsph, hsnorm
+      use ddcosmo , only : nbasis, nsph, hsnorm
 !
       implicit none
       integer,                         intent(in) :: n
-      real*8,  dimension(nylm,nsph), intent(in) :: x
+      real*8,  dimension(nbasis,nsph), intent(in) :: x
 !
       integer                                     :: isph, istatus
       real*8                                      :: vrms, vmax

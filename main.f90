@@ -105,11 +105,11 @@ real*8, parameter :: toang=0.52917721092d0, tokcal=627.509469d0
 !
 real*8, allocatable :: x(:), y(:), z(:), rvdw(:), charge(:)
 !
-! - electrostatic potential phi(ncav) and psi vector psi(nylm,n)
+! - electrostatic potential phi(ncav) and psi vector psi(nbasis,n)
 !
 real*8, allocatable :: phi(:), psi(:,:)
 !
-! - ddcosmo solution sigma (nylm,n) and adjoint solution s(nylm,n)
+! - ddcosmo solution sigma (nbasis,n) and adjoint solution s(nbasis,n)
 !
 real*8, allocatable :: sigma(:,:), s(:,:)
 !
@@ -157,13 +157,13 @@ close (100)
 ! call the initialization routine. this routine allocates memory, computes some
 ! quantities for internal use and creates and fills an array ccav(3,ncav) with
 ! the coordinates of the grid points at which the user needs to compute the potential.
-! ncav is the number of external grid points and nylm the number of spherical
+! ncav is the number of external grid points and nbasis the number of spherical
 ! harmonics functions used for the expansion of the various ddcosmo quantities;
 ! both are computed by ddinit and defined as common variables in ddcosmo.mod.
 !
 call ddinit(n,x,y,z,rvdw)
 !
-allocate (phi(ncav),psi(nylm,n))
+allocate (phi(ncav),psi(nbasis,n))
 !
 ! --------------------------   modify here  --------------------------  
 !
@@ -175,13 +175,13 @@ allocate (phi(ncav),psi(nylm,n))
 ! here, we compute the potential and the psi vector using the supplied routine mkrhs,
 ! which needs to be replaced by your routine.
 !
-call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nylm,psi)
+call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 !
 ! --------------------------   end modify   --------------------------  
 !
 ! now, call the ddcosmo solver
 !
-allocate (sigma(nylm,n))
+allocate (sigma(nbasis,n))
 !
 call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 !
@@ -196,7 +196,7 @@ write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', e
 !
 if (igrad.eq.1) then
   write(6,*)
-  allocate (s(nylm,n))
+  allocate (s(nbasis,n))
   allocate (fx(3,n))
   call cosmo(.true., .false., xx, xx, psi, s, esolv)
 !
