@@ -32,8 +32,8 @@ contains
   call mkprec
 
   ! build the RHS
-  write(6,*) 'pot'
-  do isph = 1, ngrid
+  write(6,*) 'pot', ncav
+  do isph = 1, ncav
     write(6,*) phi(isph)
   end do
   g = zero
@@ -44,11 +44,10 @@ contains
   end do
 
   call prtsph('phi',nsph,0,xs)
+  call prtsph('psi',nsph,0,psi)
 
   ! rinf rhs
   dodiag = .true.
-  write(6,*) 'entering rinfx'
-  call flush(6)
   call rinfx(nbasis*nsph,xs,rhs)
   call prtsph('rhs',nsph,0,rhs)
 

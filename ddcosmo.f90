@@ -86,7 +86,7 @@ implicit none
 !
       integer, parameter :: ndiis=25, iout=6, nngmax=100
       real*8,  parameter :: zero=0.d0, pt5=0.5d0, one=1.d0, two=2.d0, four=4.d0
-      real*8,  parameter :: se = -1.0d0
+      real*8,  parameter :: se = 0.0d0
 !
 !     - numerical constants explicitly computed
 !
@@ -1681,9 +1681,11 @@ subroutine calcv( first, isph, pot, sigma, basloc, vplm, vcos, vsin )
 !
       integer :: its, ij, jsph
       real*8  :: vij(3), sij(3)
-      real*8  :: vvij, tij, xij, oij, stslm, stslm2, stslm3
+      real*8  :: vvij, tij, xij, oij, stslm, stslm2, stslm3, &
+          & thigh
 !
 !------------------------------------------------------------------------
+      thigh = one + pt5*(se + one)*eta
 !
 !     initialize
       pot(:) = zero
@@ -1710,7 +1712,7 @@ subroutine calcv( first, isph, pot, sigma, basloc, vplm, vcos, vsin )
 !
 !           point is INSIDE j-sphere
 !           ------------------------
-            if ( tij.lt.one ) then
+            if ( tij.lt.thigh .and. tij.gt.zero) then
 !
 !             compute s_n^ij = ( r_i + \rho_i s_n - r_j ) / | ... |
               sij = vij / vvij
