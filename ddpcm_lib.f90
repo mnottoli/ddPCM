@@ -196,7 +196,11 @@ contains
   y = zero
   fourpi = four*pi
 
-  ! this loop is easily parallelizable
+  !$omp parallel do default(none) schedule(dynamic) &
+  !$omp private(isph,its,jsph,basloc,vplm,vcos,vsin,vij, &
+  !$omp vvij,tij,sij,tt,l,ind,f,m,vts,c) &
+  !$omp shared(nsph,ngrid,ui,csph,rsph,grid, &
+  !$omp lmax,fourpi,dodiag,x,y,basis)
   do isph = 1, nsph
     ! compute the "potential" from the other spheres
     ! at the exposed Lebedv points of the i-th sphere 
@@ -259,8 +263,8 @@ contains
   real*8, intent(inout) :: y(nbasis,nsph)
   integer :: isph
   ! simply do a matrix-vector product with the stored preconditioner 
-  !!$omp parallel do default(shared) schedule(dynamic) &
-  !!$omp private(isph)
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph)
   do isph = 1, nsph
     call dgemm('n','n',nbasis,1,nbasis,one,rx_prc(:,:,isph),nbasis, &
       & x(:,isph),nbasis,zero,y(:,isph),nbasis)
