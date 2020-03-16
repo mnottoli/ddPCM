@@ -32,10 +32,10 @@ contains
   call mkprec
 
   ! build the RHS
-  write(6,*) 'pot', ncav
-  do isph = 1, ncav
-    write(6,*) phi(isph)
-  end do
+  !write(6,*) 'pot', ncav
+  !do isph = 1, ncav
+  !  write(6,*) phi(isph)
+  !end do
   g = zero
   xs = zero
   call wghpot(phi,g)
@@ -43,27 +43,27 @@ contains
     call intrhs(isph,g(:,isph),xs(:,isph))
   end do
 
-  call prtsph('phi',nsph,0,xs)
-  call prtsph('psi',nsph,0,psi)
+  ! call prtsph('phi',nsph,0,xs)
+  ! call prtsph('psi',nsph,0,psi)
 
   ! rinf rhs
   dodiag = .true.
   call rinfx(nbasis*nsph,xs,rhs)
-  call prtsph('rhs',nsph,0,rhs)
+  ! call prtsph('rhs',nsph,0,rhs)
 
   ! solve the ddpcm linear system
   n_iter = 200
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
-  call prtsph('phie',nsph,0,phieps)
+  ! call prtsph('phie',nsph,0,phieps)
 
   ! solve the ddcosmo linear system
   n_iter = 200
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
       & ok,lx,ldm1x,hnorm)
-  call prtsph('x',nsph,0,xs)
+  ! call prtsph('x',nsph,0,xs)
 
   ! compute the energy
   esolv = pt5*sprod(nsph*nbasis,xs,psi)

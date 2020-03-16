@@ -114,7 +114,7 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
           do isph = 1, nsph
             call intrhs( isph, g(:,isph), rhs(:,isph) )
           enddo
-          call prtsph('phi',nsph,0,rhs)
+          ! call prtsph('phi',nsph,0,rhs)
 !
 !         deallocate workspace
           deallocate( g , stat=istatus )

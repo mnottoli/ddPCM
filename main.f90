@@ -96,7 +96,7 @@ use ddpcm_lib, only: ddpcm
 implicit none
 !
 integer :: i, ii, isph, ig, n
-real*8  :: tobohr, esolv, xx(1)
+real*8  :: tobohr, esolv, xx(1), time, omp_get_wtime
 real*8, parameter :: toang=0.52917721092d0, tokcal=627.509469d0
 !
 ! quantities to be allocated by the user.
@@ -185,10 +185,14 @@ call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 allocate (sigma(nbasis,n))
 !
 ! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
+time = omp_get_wtime()
 call ddpcm(phi,psi,esolv)
 write(6,*) 'ddpcm esolv:  ', esolv
+write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
+time = omp_get_wtime()
 call cosmo(.false.,.true.,phi, xx, psi, sigma, esolv)
 write(6,*) 'ddcosmo esolv:', esolv
+write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
 !
 if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
 !
