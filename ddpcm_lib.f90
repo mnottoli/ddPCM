@@ -56,6 +56,7 @@ contains
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
+  write(6,*) 'ddpcm step iterations:', n_iter
   ! call prtsph('phie',nsph,0,phieps)
 
   ! solve the ddcosmo linear system
@@ -63,6 +64,7 @@ contains
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
       & ok,lx,ldm1x,hnorm)
+  write(6,*) 'ddcosmo step iterations:', n_iter
   ! call prtsph('x',nsph,0,xs)
 
   ! compute the energy
