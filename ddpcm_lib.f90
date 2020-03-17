@@ -54,6 +54,7 @@ contains
   ! solve the ddpcm linear system
   n_iter = 200
   dodiag = .false.
+  phieps = xs
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
   write(6,*) 'ddpcm step iterations:', n_iter
