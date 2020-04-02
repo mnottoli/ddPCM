@@ -123,9 +123,12 @@ contains
   ! do a pseudoinversion using singular value decomposition
   do isph = 1, nsph
     scr = rx_prc(:,:,isph)
+    !call prtmat(6,rx_prc(:,:,isph),nbasis,nbasis)
     call dgesvd('A','A',nbasis,nbasis,rx_prc(1,1,isph),nbasis, &
       & s,u,nbasis,vt,nbasis,work,lwork,istatus)
     rx_prc(:,:,isph) = zero
+    write(6,*) 'sigma ', isph
+    call prtmat(8,s,nbasis,1)
     do lm = 1, nbasis
       f = one/s(lm)
       do lm1 = 1, nbasis
@@ -134,18 +137,15 @@ contains
     end do
     call dgemm('t','t',nbasis,nbasis,nbasis,one,vt,nbasis,u,nbasis, &
       & one,rx_prc(1,1,isph),nbasis)
-    call dgemm('n','n',nbasis,nbasis,nbasis,one,scr,nbasis, &
-      & rx_prc(1,1,isph),nbasis,zero,u,nbasis)
-    write(6,*) 'isph', isph
-    do lm = 1, nbasis
-      do lm1 = 1, nbasis
-        write(6,'(F12.6$)') u(lm,lm1)
-      end do 
-      write(6,*)
-    end do
+    !check if it is actually the inverse
+    !call dgemm('n','n',nbasis,nbasis,nbasis,one,scr,nbasis, &
+    !  & rx_prc(1,1,isph),nbasis,zero,u,nbasis)
+    !write(6,*) 'isph', isph
+    !call prtmat(6,u,nbasis,nbasis)
   end do
   deallocate(work)
   deallocate(scr)
+  stop
   endsubroutine mkprecsvd
 
   subroutine mkprec
@@ -156,9 +156,7 @@ contains
   real*8  :: f, f1
   integer, allocatable :: ipiv(:)
   real*8, allocatable :: work(:)
-  real*8, allocatable :: scr(:,:), u(:,:)
-  integer :: lm1
-  allocate(scr(nbasis,nbasis),u(nbasis,nbasis))
+
   allocate(ipiv(nbasis),work(nbasis*nbasis),stat=istatus)
   if (istatus.ne.0) then
     write(*,*) 'mkprec : allocation failed !'
@@ -194,27 +192,17 @@ contains
 
   ! invert the blocks
   do isph = 1, nsph
-    scr = rx_prc(:,:,isph)
     call DGETRF(nbasis,nbasis,rx_prc(:,:,isph),nbasis,ipiv,istatus)
     if (istatus.ne.0) then 
-      write(6,*) 'LU failed in mkprc'
+      write(6,*) 'LU failed in mkprec'
       stop
     end if
     call DGETRI(nbasis,rx_prc(:,:,isph),nbasis,ipiv,work, &
         & nbasis*nbasis,istatus)
     if (istatus.ne.0) then 
-      write(6,*) 'Inversion failed in mkprc'
+      write(6,*) 'Inversion failed in mkprec'
       stop
     end if
-    call dgemm('n','n',nbasis,nbasis,nbasis,one,scr,nbasis, &
-      & rx_prc(1,1,isph),nbasis,zero,u,nbasis)
-    write(6,*) 'isph', isph
-    do lm = 1, nbasis
-      do lm1 = 1, nbasis
-        write(6,'(F12.6$)') u(lm,lm1)
-      end do 
-      write(6,*)
-    end do
   end do
 
   deallocate (work,ipiv,stat=istatus)
