@@ -74,6 +74,51 @@ contains
   return
   end subroutine ddpcm
 
+  subroutine mkprecsvd
+  ! Assemble the diagonal blocks of the Reps matrix
+  ! then invert them to build the preconditioner
+  implicit none
+  integer :: isph, lm, ind, l1, m1, ind1, its, istatus
+  real*8  :: f, f1
+  integer, allocatable :: ipiv(:)
+  real*8,  allocatable :: work(:)
+
+  allocate(ipiv(nbasis),work(nbasis*nbasis),stat=istatus)
+  if (istatus.ne.0) then
+    write(*,*) 'mkprec : allocation failed !'
+    stop
+  endif
+
+  rx_prc(:,:,:) = zero
+
+  ! off diagonal part
+  do isph = 1, nsph
+    do its = 1, ngrid
+      f = two*pi*ui(its,isph)*w(its)
+      do l1 = 0, lmax
+        ind1 = l1*l1 + l1 + 1
+        do m1 = -l1, l1
+          f1 = f*basis(ind1 + m1,its)/(two*dble(l1) + one)
+          do lm = 1, nbasis
+            rx_prc(lm,ind1 + m1,isph) = rx_prc(lm,ind1 + m1,isph) + &
+                & f1*basis(lm,its)
+          end do
+        end do
+      end do
+    end do
+  end do
+
+  ! add diagonal
+  f = two*pi*(eps + one)/(eps - one)
+  do isph = 1, nsph
+    do lm = 1, nbasis
+      rx_prc(lm,lm,isph) = rx_prc(lm,lm,isph) + f
+    end do
+  end do
+
+  ! do a pseudoinversion using singular value decomposition
+  ! TODO
+  endsubroutine mkprecsvd
 
   subroutine mkprec
   ! Assemble the diagonal blocks of the Reps matrix
