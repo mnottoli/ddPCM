@@ -190,6 +190,7 @@ call ddpcm(phi,psi,esolv)
 write(6,*) 'ddpcm esolv:  ', esolv
 write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
 time = omp_get_wtime()
+stop
 call cosmo(.false.,.true.,phi, xx, psi, sigma, esolv)
 write(6,*) 'ddcosmo esolv:', esolv
 write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
