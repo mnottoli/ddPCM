@@ -29,7 +29,7 @@ contains
   tol = 10.0d0**(-iconv)
 
   ! build the preconditioner
-  call mkprecsvd
+  call mkprec
 
   ! build the RHS
   !write(6,*) 'pot', ncav

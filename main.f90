@@ -163,7 +163,9 @@ close (100)
 ! both are computed by ddinit and defined as common variables in ddcosmo.mod.
 !
 call ddinit(n,x,y,z,rvdw)
-!
+
+call cavpdb('out.pdb',csph,charge,nsph,ccav,ncav)
+
 allocate (phi(ncav),psi(nbasis,n))
 !
 ! --------------------------   modify here  --------------------------  
