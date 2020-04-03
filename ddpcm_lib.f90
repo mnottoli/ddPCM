@@ -127,8 +127,9 @@ contains
     call dgesvd('A','A',nbasis,nbasis,rx_prc(1,1,isph),nbasis, &
       & s,u,nbasis,vt,nbasis,work,lwork,istatus)
     rx_prc(:,:,isph) = zero
-    write(6,*) 'sigma ', isph
-    call prtmat(8,s,nbasis,1)
+    ! write eigenvalues to unit 8
+    !write(6,*) 'sigma ', isph
+    !call prtmat(8,s,nbasis,1)
     do lm = 1, nbasis
       f = one/s(lm)
       do lm1 = 1, nbasis
@@ -145,7 +146,6 @@ contains
   end do
   deallocate(work)
   deallocate(scr)
-  stop
   endsubroutine mkprecsvd
 
   subroutine mkprec
