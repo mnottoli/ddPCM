@@ -8,8 +8,8 @@
 RunF77 = pgfortran
 FFLAGS = -O3 -mp -llapack -lblas
 
-MODS   = ddcosmo.o newschwarz.o
-OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o forces_dd.o efld.o\
+MODS   = ddcosmo.o newschwarz.o ddpcm_lib.o
+OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o ddpcm_lib.o forces_dd.o efld.o\
 	matvec.o cosmo.o jacobi_diis.o newschwarz.o
 #
 all:    $(MODS) $(OBJS)

@@ -86,7 +86,7 @@ implicit none
 !
 integer,                         intent(in)    :: n
 real*8,  dimension(ncav),        intent(in)    :: phi
-real*8,  dimension(nylm,nsph),   intent(in)    :: sigma, s
+real*8,  dimension(nbasis,nsph),   intent(in)    :: sigma, s
 real*8,  dimension(3,n),         intent(inout) :: fx
 !
 integer :: isph, ig, ii, c1, c2, cr
@@ -96,7 +96,7 @@ real*8, allocatable :: xi(:,:), phiexp(:,:), zeta(:), ef(:,:)
 real*8, allocatable :: basloc(:), dbsloc(:,:), vplm(:), vcos(:), vsin(:)
 !
 allocate (xi(ngrid,nsph),phiexp(ngrid,nsph))
-allocate (basloc(nylm),dbsloc(3,nylm),vplm(nylm),vcos(lmax+1),vsin(lmax+1))
+allocate (basloc(nbasis),dbsloc(3,nbasis),vplm(nbasis),vcos(lmax+1),vsin(lmax+1))
 !
 ! initialize the timer:
 !

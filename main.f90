@@ -1,6 +1,7 @@
 program main
 use ddcosmo
 use newschwarz
+use ddpcm_lib, only: ddpcm
 ! 
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
 !      888      888 d88P  Y88b d88P" "Y88b d88P  Y88b 8888b   d8888 d88P" "Y88b 
@@ -96,7 +97,7 @@ use newschwarz
 implicit none
 !
 integer :: i, ii, isph, ig, n
-real*8  :: tobohr, esolv, xx(1)
+real*8  :: tobohr, esolv, xx(1), time, omp_get_wtime
 real*8, parameter :: toang=0.52917721092d0, tokcal=627.509469d0
 !
 ! quantities to be allocated by the user.
@@ -106,11 +107,11 @@ real*8, parameter :: toang=0.52917721092d0, tokcal=627.509469d0
 !
 real*8, allocatable :: x(:), y(:), z(:), rvdw(:), charge(:)
 !
-! - electrostatic potential phi(ncav) and psi vector psi(nylm,n)
+! - electrostatic potential phi(ncav) and psi vector psi(nbasis,n)
 !
 real*8, allocatable :: phi(:), psi(:,:)
 !
-! - ddcosmo solution sigma (nylm,n) and adjoint solution s(nylm,n)
+! - ddcosmo solution sigma (nbasis,n) and adjoint solution s(nbasis,n)
 !
 real*8, allocatable :: sigma(:,:), s(:,:)
 !
@@ -158,13 +159,13 @@ close (100)
 ! call the initialization routine. this routine allocates memory, computes some
 ! quantities for internal use and creates and fills an array ccav(3,ncav) with
 ! the coordinates of the grid points at which the user needs to compute the potential.
-! ncav is the number of external grid points and nylm the number of spherical
+! ncav is the number of external grid points and nbasis the number of spherical
 ! harmonics functions used for the expansion of the various ddcosmo quantities;
 ! both are computed by ddinit and defined as common variables in ddcosmo.mod.
 !
 call ddinit(n,x,y,z,rvdw)
 !
-allocate (phi(ncav),psi(nylm,n))
+allocate (phi(ncav),psi(nbasis,n))
 !
 ! --------------------------   modify here  --------------------------  
 !
@@ -176,22 +177,39 @@ allocate (phi(ncav),psi(nylm,n))
 ! here, we compute the potential and the psi vector using the supplied routine mkrhs,
 ! which needs to be replaced by your routine.
 !
-call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nylm,psi)
+call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 !
 ! --------------------------   end modify   --------------------------  
 !
 ! now, call the ddcosmo solver
 !
+<<<<<<< HEAD
 !
 allocate (sigma(nylm,n))
 !call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 call nddcosmo(phi,psi,esolv)
+=======
+allocate (sigma(nbasis,n))
+!
+! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
+time = omp_get_wtime()
+call ddpcm(phi,psi,esolv)
+write(6,*) 'ddpcm esolv:  ', esolv
+write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
+time = omp_get_wtime()
+call cosmo(.false.,.true.,phi, xx, psi, sigma, esolv)
+write(6,*) 'ddcosmo esolv:', esolv
+write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
+>>>>>>> ddpcm
 !
 !if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
 !
 write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
+<<<<<<< HEAD
 call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
+=======
+>>>>>>> ddpcm
 stop
 !
 ! this is all for the energy. if the forces are also required, call the solver for
@@ -201,7 +219,7 @@ stop
 !
 if (igrad.eq.1) then
   write(6,*)
-  allocate (s(nylm,n))
+  allocate (s(nbasis,n))
   allocate (fx(3,n))
   call cosmo(.true., .false., xx, xx, psi, s, esolv)
 !

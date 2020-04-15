@@ -86,7 +86,7 @@ implicit none
 !
       integer, parameter :: ndiis=25, iout=6, nngmax=100
       real*8,  parameter :: zero=0.d0, pt5=0.5d0, one=1.d0, two=2.d0, four=4.d0
-      real*8,  parameter :: se = -1.0d0
+      real*8,  parameter :: se = 0.0d0
 !
 !     - numerical constants explicitly computed
 !
@@ -110,9 +110,9 @@ implicit none
 !
 !     nsph   - number of spheres/atoms
 !     ncav   - number of integration points on cavity's boundary
-!     nylm - number of basis functions, i.e., spherical harmonics
+!     nbasis - number of basis functions, i.e., spherical harmonics
 !
-      integer :: nsph, ncav, nylm
+      integer :: nsph, ncav, nbasis
 !
 !     - workspaces
 !
@@ -205,10 +205,10 @@ subroutine ddinit(n,x,y,z,rvdw)
 ! allocate:
 !
       grad   = igrad.ne.0
-      nylm   = (lmax+1)*(lmax+1)
-      allocate( rsph(nsph), csph(3,nsph), w(ngrid), grid(3,ngrid), basis(nylm,ngrid), &
+      nbasis   = (lmax+1)*(lmax+1)
+      allocate( rsph(nsph), csph(3,nsph), w(ngrid), grid(3,ngrid), basis(nbasis,ngrid), &
                 inl(nsph+1), nl(nsph*nngmax), fi(ngrid,nsph), ui(ngrid,nsph), &
-                fact(max(2*lmax+1,2)), facl(nylm), facs(nylm) , stat=istatus )
+                fact(max(2*lmax+1,2)), facl(nbasis), facs(nbasis) , stat=istatus )
       if ( istatus.ne.0 ) then
         write(*,*)'ddinit : [1] allocation failed !'
         stop
@@ -255,7 +255,7 @@ subroutine ddinit(n,x,y,z,rvdw)
 !
 ! build a basis of spherical harmonics at the gridpoints:
 !
-      allocate (vplm(nylm),vcos(lmax+1),vsin(lmax+1), stat=istatus)
+      allocate (vplm(nbasis),vcos(lmax+1),vsin(lmax+1), stat=istatus)
       if ( istatus.ne.0 ) then
         write(*,*)'ddinit : [2] allocation failed !'
         stop
@@ -719,7 +719,7 @@ end subroutine ptcart
 !
 !
 !------------------------------------------------------------------------------------------------
-! Purpose : dump an array (nylm,ncol) or just a column.
+! Purpose : dump an array (nbasis,ncol) or just a column.
 !------------------------------------------------------------------------------------------------
 subroutine prtsph(label,ncol,icol,x)
 !        
@@ -727,7 +727,7 @@ subroutine prtsph(label,ncol,icol,x)
 !
       character (len=*), intent(in) :: label
       integer, intent(in)           :: ncol, icol
-      real*8, dimension(nylm,ncol), intent(in) :: x
+      real*8, dimension(nbasis,ncol), intent(in) :: x
 !
       integer :: l, m, ind, noff, nprt, ic, j
 !
@@ -791,7 +791,7 @@ subroutine intrhs( isph, x, xlm )
       implicit none
       integer, intent(in) :: isph
       real*8, dimension(ngrid),  intent(in)    :: x
-      real*8, dimension(nylm), intent(inout) :: xlm
+      real*8, dimension(nbasis), intent(inout) :: xlm
 !
       integer :: ig
 !      
@@ -831,7 +831,7 @@ subroutine ylmbas( x, basloc, vplm, vcos, vsin )
 !        
       implicit none
       real*8, dimension(3), intent(in) :: x
-      real*8, dimension(nylm), intent(out) :: basloc, vplm
+      real*8, dimension(nbasis), intent(out) :: basloc, vplm
       real*8, dimension(lmax+1), intent(out) :: vcos, vsin
 !
       integer :: l, m, ind
@@ -905,8 +905,8 @@ subroutine dbasis( x, basloc, dbsloc, vplm, vcos, vsin )
 !
       implicit none
       real*8, dimension(3),        intent(in)    :: x
-      real*8, dimension(nylm),   intent(inout) :: basloc, vplm
-      real*8, dimension(3,nylm), intent(inout) :: dbsloc
+      real*8, dimension(nbasis),   intent(inout) :: basloc, vplm
+      real*8, dimension(3,nbasis), intent(inout) :: dbsloc
       real*8, dimension(lmax+1),   intent(inout) :: vcos, vsin
 !
       integer :: l, m, ind, VC, VS
@@ -1057,7 +1057,7 @@ subroutine polleg( x, y, plm )
 !          
       implicit none
       real*8,                    intent(in)    :: x, y
-      real*8, dimension(nylm), intent(inout) :: plm
+      real*8, dimension(nbasis), intent(inout) :: plm
 !
       integer :: m, ind, l, ind2
       real*8  :: fact, pmm, somx2, pmm1, pmmo, pll, fm, fl
@@ -1141,7 +1141,7 @@ real*8 function intmlp( t, sigma, basloc )
 !  
       implicit none
       real*8, intent(in) :: t
-      real*8, dimension(nylm), intent(in) :: sigma, basloc
+      real*8, dimension(nbasis), intent(in) :: sigma, basloc
 !
       integer :: l, ind
       real*8  :: tt, ss, fac
@@ -1233,7 +1233,7 @@ end subroutine wghpot
 subroutine hsnorm( u, unorm )
 !          
       implicit none
-      real*8, dimension(nylm), intent(in)    :: u
+      real*8, dimension(nbasis), intent(in)    :: u
       real*8,                    intent(inout) :: unorm
 !
       integer :: l, m, ind
@@ -1303,8 +1303,8 @@ subroutine adjrhs( isph, xi, vlm, basloc, vplm, vcos, vsin )
       implicit none
       integer,                       intent(in)    :: isph
       real*8, dimension(ngrid,nsph), intent(in)    :: xi
-      real*8, dimension(nylm),     intent(inout) :: vlm
-      real*8, dimension(nylm),     intent(inout) :: basloc, vplm
+      real*8, dimension(nbasis),     intent(inout) :: vlm
+      real*8, dimension(nbasis),     intent(inout) :: basloc, vplm
       real*8, dimension(lmax+1),     intent(inout) :: vcos, vsin
 !
       integer :: ij, jsph, ig, l, ind, m
@@ -1437,10 +1437,10 @@ subroutine fdoka( isph, sigma, xi, basloc, dbsloc, vplm, vcos, vsin, fx )
 !        
       implicit none
       integer,                         intent(in)    :: isph
-      real*8,  dimension(nylm,nsph), intent(in)    :: sigma
+      real*8,  dimension(nbasis,nsph), intent(in)    :: sigma
       real*8,  dimension(ngrid),       intent(in)    :: xi
-      real*8,  dimension(nylm),      intent(inout) :: basloc, vplm
-      real*8,  dimension(3,nylm),    intent(inout) :: dbsloc
+      real*8,  dimension(nbasis),      intent(inout) :: basloc, vplm
+      real*8,  dimension(3,nbasis),    intent(inout) :: dbsloc
       real*8,  dimension(lmax+1),      intent(inout) :: vcos, vsin
       real*8,  dimension(3),           intent(inout) :: fx
 !
@@ -1512,10 +1512,10 @@ subroutine fdokb( isph, sigma, xi, basloc, dbsloc, vplm, vcos, vsin, fx )
 !        
       implicit none
       integer,                         intent(in)    :: isph
-      real*8,  dimension(nylm,nsph), intent(in)    :: sigma
+      real*8,  dimension(nbasis,nsph), intent(in)    :: sigma
       real*8,  dimension(ngrid,nsph),  intent(in)    :: xi
-      real*8,  dimension(nylm),      intent(inout) :: basloc, vplm
-      real*8,  dimension(3,nylm),    intent(inout) :: dbsloc
+      real*8,  dimension(nbasis),      intent(inout) :: basloc, vplm
+      real*8,  dimension(3,nbasis),    intent(inout) :: dbsloc
       real*8,  dimension(lmax+1),      intent(inout) :: vcos, vsin
       real*8,  dimension(3),           intent(inout) :: fx
 !
@@ -1672,18 +1672,20 @@ subroutine calcv( first, isph, pot, sigma, basloc, vplm, vcos, vsin )
 !
       logical,                        intent(in)    :: first
       integer,                        intent(in)    :: isph
-      real*8, dimension(nylm,nsph), intent(in)    :: sigma
+      real*8, dimension(nbasis,nsph), intent(in)    :: sigma
       real*8, dimension(ngrid),       intent(inout) :: pot
-      real*8, dimension(nylm),      intent(inout) :: basloc
-      real*8, dimension(nylm),      intent(inout) :: vplm
+      real*8, dimension(nbasis),      intent(inout) :: basloc
+      real*8, dimension(nbasis),      intent(inout) :: vplm
       real*8, dimension(lmax+1),      intent(inout) :: vcos
       real*8, dimension(lmax+1),      intent(inout) :: vsin
 !
       integer :: its, ij, jsph
       real*8  :: vij(3), sij(3)
-      real*8  :: vvij, tij, xij, oij, stslm, stslm2, stslm3
+      real*8  :: vvij, tij, xij, oij, stslm, stslm2, stslm3, &
+          & thigh
 !
 !------------------------------------------------------------------------
+      thigh = one + pt5*(se + one)*eta
 !
 !     initialize
       pot(:) = zero
@@ -1710,7 +1712,7 @@ subroutine calcv( first, isph, pot, sigma, basloc, vplm, vcos, vsin )
 !
 !           point is INSIDE j-sphere
 !           ------------------------
-            if ( tij.lt.one ) then
+            if ( tij.lt.thigh .and. tij.gt.zero) then
 !
 !             compute s_n^ij = ( r_i + \rho_i s_n - r_j ) / | ... |
               sij = vij / vvij
@@ -1757,7 +1759,7 @@ end subroutine calcv
 !------------------------------------------------------------------------
 subroutine ddmkxi( s, xi)
 !
-       real*8, dimension(nylm,nsph), intent(in)    :: s
+       real*8, dimension(nbasis,nsph), intent(in)    :: s
        real*8, dimension(ncav),      intent(inout) :: xi
 !
        integer :: its, isph, ii
@@ -1786,7 +1788,7 @@ end subroutine ddmkxi
 !------------------------------------------------------------------------
 subroutine ddmkzeta( s, zeta)
 !
-       real*8, dimension(nylm,nsph), intent(in)    :: s
+       real*8, dimension(nbasis,nsph), intent(in)    :: s
        real*8, dimension(ncav),      intent(inout) :: zeta
 !
        integer :: its, isph, ii

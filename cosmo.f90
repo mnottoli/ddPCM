@@ -56,14 +56,14 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
 !   - if star is false, computes the solvation energy.
 !---------------------------------------------------------------------------------------
 !
-      use ddcosmo , only : iprint, ncav, nylm, nsph, iconv, zero, ngrid, ndiis,      &
+      use ddcosmo , only : iprint, ncav, nbasis, nsph, iconv, zero, ngrid, ndiis,      &
                            wghpot, intrhs, facl, pt5, eps, sprod, iout, one, prtsph
 !      
       implicit none
       logical,                         intent(in)    :: star, cart
       real*8,  dimension(ncav),        intent(in)    :: phi
-      real*8,  dimension(nylm,nsph), intent(in)      :: glm, psi
-      real*8,  dimension(nylm,nsph), intent(inout)   :: sigma
+      real*8,  dimension(nbasis,nsph), intent(in)      :: glm, psi
+      real*8,  dimension(nbasis,nsph), intent(inout)   :: sigma
       real*8,                          intent(inout) :: esolv
 !
       integer              :: isph, istatus, n_iter, info, c1, c2, cr
@@ -90,7 +90,7 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
       if ( .not.star ) then
 !
 !       allocate workspace for rhs
-        allocate( rhs(nylm,nsph) , stat=istatus )
+        allocate( rhs(nbasis,nsph) , stat=istatus )
         if (istatus .ne. 0) then
           write(*,*) ' cosmo: [2] failed allocation'
         endif
@@ -114,6 +114,7 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
           do isph = 1, nsph
             call intrhs( isph, g(:,isph), rhs(:,isph) )
           enddo
+          ! call prtsph('phi',nsph,0,rhs)
 !
 !         deallocate workspace
           deallocate( g , stat=istatus )
@@ -147,13 +148,12 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
 !         action of  diag^-1 :  ldm1x
 !         action of  offdiag :  lx
 !
-          call jacobi_diis( nsph*nylm, iprint, ndiis, 4, tol, rhs, sigma, n_iter, ok, lx, ldm1x, hnorm )
+          call jacobi_diis( nsph*nbasis, iprint, ndiis, 4, tol, rhs, sigma, n_iter, ok, lx, ldm1x, hnorm )
 !
 !       4. SOLVATION ENERGY
 !       -------------------
 !
-        esolv = pt5 * ((eps - one)/eps) * sprod( nsph*nylm, sigma, psi )
-        write(6,*) n_iter, esolv
+        esolv = pt5 * ((eps - one)/eps) * sprod( nsph*nbasis, sigma, psi )
 !
 !       deallocate workspace
         deallocate( rhs , stat=istatus )
@@ -181,7 +181,7 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
 !
 !       Jacobi method : see above
 !
-        call jacobi_diis( nsph*nylm, iprint, ndiis, 4, tol, psi, sigma, n_iter, ok, lstarx, ldm1x, hnorm )
+        call jacobi_diis( nsph*nbasis, iprint, ndiis, 4, tol, psi, sigma, n_iter, ok, lstarx, ldm1x, hnorm )
 !          
       endif
 !
