@@ -222,6 +222,7 @@ subroutine cosmo( star, cart, phi, glm, psi, sigma, esolv )
         write(iout,*)
 ! 
       endif
+      deallocate(rhs)
 !
 !
 endsubroutine cosmo

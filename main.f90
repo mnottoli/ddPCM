@@ -1,6 +1,6 @@
 program main
 use ddcosmo
-use newschwarz
+use newschwarz, only: nddpcm, nddcosmo
 use ddpcm_lib, only: ddpcm
 ! 
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
@@ -180,26 +180,27 @@ allocate (phi(ncav),psi(nbasis,n))
 call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 !
 ! --------------------------   end modify   --------------------------  
-!
-! now, call the ddcosmo solver
-!
-allocate (sigma(nbasis,n))
-!call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
-!call nddcosmo(phi,psi,esolv)
-!
-! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
+
+time = omp_get_wtime()
+call simpleddcosmo(phi,psi,esolv)
+write(6,*) 'ddcosmo esolv:', esolv
+write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
+
+time = omp_get_wtime()
+call nddcosmo(phi,psi,esolv)
+write(6,*) 'nddcosmo esolv:  ', esolv
+write(6,*) 'nddcosmo time:   ', omp_get_wtime() - time
+
 time = omp_get_wtime()
 call ddpcm(phi,psi,esolv)
 write(6,*) 'ddpcm esolv:  ', esolv
 write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
+
 time = omp_get_wtime()
-call cosmo(.false.,.true.,phi, xx, psi, sigma, esolv)
-write(6,*) 'ddcosmo esolv:', esolv
-write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
-!
-!if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
-!
-write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
+call nddpcm(phi,psi,esolv)
+write(6,*) 'nddpcm esolv:  ', esolv
+write(6,*) 'nddpcm time:   ', omp_get_wtime() - time
+
 stop
 !
 ! this is all for the energy. if the forces are also required, call the solver for

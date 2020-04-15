@@ -1,10 +1,65 @@
 module newschwarz
 use ddcosmo
+use ddpcm_lib
+
 implicit none
 ! preconditioner array
 real*8, allocatable :: nlprec(:,:,:)
-real*8 :: p
+real*8, parameter :: p = 0.2
 contains
+
+subroutine nddpcm(phi, psi, esolv)
+  ! main ddpcm driver, given the potential at the exposed cavity
+  ! points and the psi vector, computes the solvation energy
+  implicit none
+  real*8, intent(in) :: phi(ncav), psi(nbasis,nsph)
+  real*8, intent(inout) :: esolv
+  real*8 :: tol
+  integer :: isph, n_iter
+  logical :: ok
+  external :: lx, ldm1x, hnorm
+  
+  ! initial setup
+  allocate(rx_prc(nbasis,nbasis,nsph),nlprec(nbasis,nbasis,nsph))
+  allocate(rhs(nbasis,nsph),phieps(nbasis,nsph),x(nbasis,nsph))
+  allocate(g(ngrid,nsph))
+  tol = 10.0d0**(-iconv)
+
+  ! build ddpcm and nddcosmo preconditioners
+  call mkprec
+  call build_nlprec
+
+  ! build rhs
+  call wghpot(phi,g)
+  do isph = 1, nsph
+    call intrhs(isph,g(:,isph),x(:,isph))
+  end do
+
+  ! rinf rhs
+  dodiag = .true.
+  call rinfx(nbasis*nsph,x,rhs)
+
+  ! solve the ddpcm linear system
+  phieps = x
+  n_iter = 200
+  dodiag = .false.
+  call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
+    & ok,rx,apply_rx_prec,hnorm)
+  write(6,*) 'ddpcm step iterations:', n_iter
+
+  ! solve ddcosmo
+  call apply_nlprec(nbasis*nsph,phieps,x) 
+  n_iter  = 200
+  dodiag = .false.
+  call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,x,n_iter, &
+    & ok,nlx,apply_nlprec,hnorm)
+  write(6,*) 'nddcosmo step iterations:', n_iter
+
+  ! compute the energy
+  esolv = pt5*sprod(nsph*nbasis,x,psi)
+
+  deallocate(rx_prc,rhs,phieps,x,g,nlprec)
+end subroutine nddpcm
 
 subroutine nddcosmo(phi,psi,esolv)
   ! new main (inside the module for clarity) 
@@ -18,44 +73,33 @@ subroutine nddcosmo(phi,psi,esolv)
   external :: hnorm, lx
   integer :: cr, c1, c2, c3
   integer :: i
-  allocate(x(nbasis,nsph),rhs(nbasis,nsph),scr(ngrid,nsph))
-
-  ! initialize the timer
-  call system_clock(count_rate=cr)
+  allocate(x(nbasis,nsph),rhs(nbasis,nsph),g(ngrid,nsph))
+  allocate(nlprec(nbasis,nbasis,nsph))
 
   ! build the RHS 
-  call wghpot(phi, scr)
+  call wghpot(phi, g)
   do isph = 1, nsph
-    call intrhs(isph,scr(:,isph),rhs(:,isph)) 
+    call intrhs(isph,g(:,isph),rhs(:,isph)) 
   end do
-  ! call prtsph('rhs of the ddCOSMO equation',nsph,0,rhs)
-  deallocate(scr)
 
-
-  do i = 1, 4
-  p = dble(i)*0.1d0
-  ! assemble and store the preconditioner
-  call system_clock(count=c1)
+  ! setup
   call build_nlprec()
-  call system_clock(count=c2)
+  tol = 10.0d0**(-iconv)
+
+  ! guess
+  call apply_nlprec(nbasis*nsph,rhs,x) 
 
   ! solve ddcosmo
-  call apply_nlprec(nbasis*nsph,rhs,x) 
-  tol = 10.0d0**(-iconv)
+  dodiag = .false.
   n_iter  = 200
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,x,n_iter,ok,nlx, &
     & apply_nlprec,hnorm)
-  !write(6,*) p, n_iter 
-
-  call system_clock(count=c3)
-  !write(6,'(A15,F15.8)') 'precond time', dble(c2-c1)/dble(cr)
-  !write(6,'(A15,F15.8)') 'solver time', dble(c3-c2)/dble(cr)
+  write(6,*) 'ddcosmo iterations:', n_iter
 
   ! compute the energy
   esolv = pt5*((eps - one)/eps)*sprod(nsph*nbasis,x,psi)
-  write(6,'(F4.2,I5,3F15.8)') p, n_iter, dble(c3-c2)/dble(cr), dble(c2-c1)/dble(cr), esolv
-  end do
-  return
+
+  deallocate(x,rhs,g,nlprec)
 end subroutine nddcosmo 
 
 subroutine nlx(n,x,y)
@@ -183,7 +227,6 @@ subroutine build_nlprec()
   real*8, allocatable :: work(:)
 
   ! initialize the preconditioner
-  allocate(nlprec(nbasis,nbasis,nsph),stat=istatus)
   nlprec = zero
 
   ! debug for matrix inversion

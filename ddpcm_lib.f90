@@ -6,7 +6,7 @@ use ddcosmo, only: nbasis, nsph, ngrid, ncav, lmax, iconv, iprint, &
 implicit none
 
 real*8, allocatable :: rx_prc(:,:,:)
-real*8, allocatable :: rhs(:,:), phieps(:,:), xs(:,:)
+real*8, allocatable :: rhs(:,:), phieps(:,:), x(:,:)
 real*8, allocatable :: g(:,:)
 logical :: dodiag
 
@@ -24,7 +24,7 @@ contains
   external :: lx, ldm1x, hnorm
   
   allocate(rx_prc(nbasis,nbasis,nsph))
-  allocate(rhs(nbasis,nsph),phieps(nbasis,nsph),xs(nbasis,nsph))
+  allocate(rhs(nbasis,nsph),phieps(nbasis,nsph),x(nbasis,nsph))
   allocate(g(ngrid,nsph))
   tol = 10.0d0**(-iconv)
 
@@ -32,29 +32,19 @@ contains
   call mkprec
 
   ! build the RHS
-  !write(6,*) 'pot', ncav
-  !do isph = 1, ncav
-  !  write(6,*) phi(isph)
-  !end do
-  g = zero
-  xs = zero
   call wghpot(phi,g)
   do isph = 1, nsph
-    call intrhs(isph,g(:,isph),xs(:,isph))
+    call intrhs(isph,g(:,isph),x(:,isph))
   end do
-
-  ! call prtsph('phi',nsph,0,xs)
-  ! call prtsph('psi',nsph,0,psi)
 
   ! rinf rhs
   dodiag = .true.
-  call rinfx(nbasis*nsph,xs,rhs)
-  ! call prtsph('rhs',nsph,0,rhs)
+  call rinfx(nbasis*nsph,x,rhs)
 
   ! solve the ddpcm linear system
   n_iter = 200
   dodiag = .false.
-  phieps = xs
+  phieps = x
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
   write(6,*) 'ddpcm step iterations:', n_iter
@@ -63,15 +53,14 @@ contains
   ! solve the ddcosmo linear system
   n_iter = 200
   dodiag = .false.
-  call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
+  call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,x,n_iter, &
       & ok,lx,ldm1x,hnorm)
   write(6,*) 'ddcosmo step iterations:', n_iter
-  ! call prtsph('x',nsph,0,xs)
 
   ! compute the energy
-  esolv = pt5*sprod(nsph*nbasis,xs,psi)
+  esolv = pt5*sprod(nsph*nbasis,x,psi)
 
-  return
+  deallocate(rx_prc,rhs,phieps,x,g)
   end subroutine ddpcm
 
 
