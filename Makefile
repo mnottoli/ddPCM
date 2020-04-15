@@ -3,10 +3,10 @@
 #
 #RunF77 = ifort
 #FFLAGS = -O3 -xHost -qopenmp
-RunF77 = gfortran
-FFLAGS = -O3 -march=native -llapack -lblas -fopenmp
-#RunF77 = pgfortran
-#FFLAGS = -O3 -mp
+#RunF77 = gfortran
+#FFLAGS = -O3 -march=native -llapack -lblas -fopenmp
+RunF77 = pgfortran
+FFLAGS = -O3 -mp -llapack -lblas
 
 MODS   = ddcosmo.o newschwarz.o
 OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o forces_dd.o efld.o\
