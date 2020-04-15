@@ -183,13 +183,9 @@ call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 !
 ! now, call the ddcosmo solver
 !
-<<<<<<< HEAD
-!
-allocate (sigma(nylm,n))
-!call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
-call nddcosmo(phi,psi,esolv)
-=======
 allocate (sigma(nbasis,n))
+!call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
+!call nddcosmo(phi,psi,esolv)
 !
 ! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 time = omp_get_wtime()
@@ -200,16 +196,10 @@ time = omp_get_wtime()
 call cosmo(.false.,.true.,phi, xx, psi, sigma, esolv)
 write(6,*) 'ddcosmo esolv:', esolv
 write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
->>>>>>> ddpcm
 !
 !if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
 !
 write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
-<<<<<<< HEAD
-call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
-write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
-=======
->>>>>>> ddpcm
 stop
 !
 ! this is all for the energy. if the forces are also required, call the solver for
