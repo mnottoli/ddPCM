@@ -341,7 +341,7 @@ contains
   !$omp private(isph,its,jsph,basloc,vplm,vcos,vsin,vji, &
   !$omp vvji,tji,sji,tt,l,ind,f,m,vts,c) &
   !$omp shared(nsph,ngrid,ui,csph,rsph,grid,facl, &
-  !$omp lmax,fourpi,dodiag,x,y,basis,w)
+  !$omp lmax,fourpi,dodiag,x,y,basis,w,nbasis)
   do isph = 1, nsph
     do jsph = 1, nsph
       if (jsph.ne.isph) then
@@ -368,8 +368,8 @@ contains
       else if (dodiag) then
         do its = 1, ngrid
           f = pt5*w(its)*ui(its,jsph)*dot_product(basis(:,its),x(:,jsph))
-          do lm = 1, nylm
-            y(lm,isph) = y(lm,isph) - f*basis(indlm,its)/facl(lm)
+          do ind = 1, nbasis
+            y(ind,isph) = y(ind,isph) - f*basis(ind,its)/facl(ind)
           end do
         end do
       end if
