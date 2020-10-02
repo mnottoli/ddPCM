@@ -1,31 +1,35 @@
 module ddpcm_lib
 use ddcosmo, only: nbasis, nsph, ngrid, ncav, lmax, iconv, iprint, &
     & wghpot, intrhs, prtsph, zero, pt5, one, two, four, pi, basis, &
-    & eps, csph, rsph, grid, w, ui, ndiis, sprod, ylmbas
+    & eps, csph, rsph, grid, w, ui, ndiis, sprod, ylmbas, facl, ddmkxi, &
+    & ptcart
 !use ddcosmo
 implicit none
 
 real*8, allocatable :: rx_prc(:,:,:)
 real*8, allocatable :: rhs(:,:), phieps(:,:), xs(:,:)
+real*8, allocatable :: s(:,:), y(:,:)
 real*8, allocatable :: g(:,:)
 logical :: dodiag
 
 contains
 
-  subroutine ddpcm(phi, psi, esolv)
+  subroutine ddpcm(phi, psi, do_adjoint, esolv)
   ! main ddpcm driver, given the potential at the exposed cavity
   ! points and the psi vector, computes the solvation energy
   implicit none
   real*8, intent(in) :: phi(ncav), psi(nbasis,nsph)
   real*8, intent(inout) :: esolv
-  real*8 :: tol
+  logical, intent(in) :: do_adjoint
+  real*8 :: tol, fac
   integer :: isph, n_iter
   logical :: ok
-  external :: lx, ldm1x, hnorm
+  external :: lx, ldm1x, lstarx, hnorm
   
   allocate(rx_prc(nbasis,nbasis,nsph))
   allocate(rhs(nbasis,nsph),phieps(nbasis,nsph),xs(nbasis,nsph))
   allocate(g(ngrid,nsph))
+  allocate(s(nbasis,nsph),y(nbasis,nsph))
   tol = 10.0d0**(-iconv)
 
   ! build the preconditioner
@@ -71,6 +75,27 @@ contains
   ! compute the energy
   esolv = pt5*sprod(nsph*nbasis,xs,psi)
 
+  if (do_adjoint) then
+
+    ! solve ddcosmo adjoint system
+    n_iter = 200
+    dodiag = .false.
+    call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,psi,s,n_iter, &
+      & ok,lstarx,ldm1x,hnorm)
+    call prtsph('S',nsph,0,s)
+
+    ! solve ddpcm adjoint system
+    n_iter = 200
+    dodiag = .false.
+    call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,s,y,n_iter, &
+      & ok,rstarx,apply_rstarx_prec,hnorm)
+    call prtsph('Y',nsph,0,y)
+
+    ! recover effect of Rinf^*
+    fac = two*pi*(one - (eps + one)/(eps - one))
+    y = s + fac*y
+    call prtsph('adjoint ddpcm solution',nsph,0,y)
+  end if
   return
   end subroutine ddpcm
 
@@ -273,5 +298,100 @@ contains
       & x(:,isph),nbasis,zero,y(:,isph),nbasis)
   end do
   end subroutine apply_rx_prec
+
+  subroutine rstarx(n,x,y)
+  ! Computes Y = Reps X =
+  ! = (2*pi*(eps + 1)/(eps - 1) - D^*) X 
+  implicit none
+  integer, intent(in) :: n
+  real*8, intent(in) :: x(nbasis,nsph)
+  real*8, intent(inout) :: y(nbasis,nsph)
+  real*8 :: fac
+
+  call dstarx(n,x,y)
+  y = -y
+
+  if (dodiag) then
+    fac = two*pi*(eps + one)/(eps - one)
+    y = y + fac*x
+  end if
+  end subroutine rstarx
+
+  subroutine dstarx(n,x,y)
+  ! Computes Y = D^* X
+  implicit none
+  integer, intent(in) :: n
+  real*8, intent(in) :: x(nbasis,nsph)
+  real*8, intent(inout) :: y(nbasis,nsph)
+  real*8, allocatable :: vts(:), vplm(:), basloc(:), vcos(:), vsin(:)
+  real*8 :: c(3), vji(3), sji(3)
+  real*8 :: vvji, tji, fourpi, tt, f, f1
+  integer :: its, isph, jsph, l, m, ind, lm, istatus
+  
+  allocate(vts(ngrid),vplm(nbasis),basloc(nbasis),vcos(lmax + 1), &
+      & vsin(lmax + 1),stat=istatus)
+  if (istatus.ne.0) then
+    write(6,*) 'dx: allocation failed !'
+    stop
+  end if
+  y = zero
+  fourpi = four*pi
+
+  !$omp parallel do default(none) schedule(dynamic) &
+  !$omp private(isph,its,jsph,basloc,vplm,vcos,vsin,vji, &
+  !$omp vvji,tji,sji,tt,l,ind,f,m,vts,c) &
+  !$omp shared(nsph,ngrid,ui,csph,rsph,grid,facl, &
+  !$omp lmax,fourpi,dodiag,x,y,basis,w)
+  do isph = 1, nsph
+    do jsph = 1, nsph
+      if (jsph.ne.isph) then
+        do its = 1, ngrid
+          if (ui(its,jsph).gt.zero) then
+            ! build the geometrical variables
+            vji = csph(:,jsph) + rsph(jsph)*grid(:,its) - csph(:,isph)
+            vvji = sqrt(dot_product(vji,vji))
+            tji = vvji/rsph(isph)
+            sji = vji/vvji
+            ! build the local basis
+            call ylmbas(sji,basloc,vplm,vcos,vsin)
+            tt = w(its)*ui(its,jsph)*dot_product(basis(:,its),x(:,jsph))/tji
+            do l = 0, lmax
+              ind = l*l + l + 1
+              f = dble(l)*tt/facl(ind)
+              do m = -l, l
+                y(ind+m,isph) = y(ind+m,isph) + f*basloc(ind+m)
+              end do
+              tt = tt/tji
+            end do
+          end if
+        end do
+      else if (dodiag) then
+        ! do something
+      end if
+    end do
+  end do
+
+  deallocate(vts,vplm,basloc,vcos,vsin,stat=istatus)
+  if (istatus.ne.0) then
+    write(6,*) 'dx: deallocation failed !'
+    stop
+  end if
+  end subroutine dstarx
+
+  subroutine apply_rstarx_prec(n,x,y)
+  ! apply the block diagonal preconditioner
+  implicit none
+  integer, intent(in) :: n
+  real*8, intent(in) :: x(nbasis,nsph)
+  real*8, intent(inout) :: y(nbasis,nsph)
+  integer :: isph
+  ! simply do a matrix-vector product with the transposed preconditioner 
+  !$omp parallel do default(shared) schedule(dynamic) &
+  !$omp private(isph)
+  do isph = 1, nsph
+    call dgemm('t','n',nbasis,1,nbasis,one,rx_prc(:,:,isph),nbasis, &
+      & x(:,isph),nbasis,zero,y(:,isph),nbasis)
+  end do
+  end subroutine apply_rstarx_prec
 
 end module ddpcm_lib

@@ -186,7 +186,7 @@ allocate (sigma(nbasis,n))
 !
 ! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 time = omp_get_wtime()
-call ddpcm(phi,psi,esolv)
+call ddpcm(phi,psi,.true.,esolv)
 write(6,*) 'ddpcm esolv:  ', esolv
 write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
 time = omp_get_wtime()
