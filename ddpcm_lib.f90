@@ -366,7 +366,12 @@ contains
           end if
         end do
       else if (dodiag) then
-        ! do something
+        do its = 1, ngrid
+          f = pt5*w(its)*ui(its,jsph)*dot_product(basis(:,its),x(:,jsph))
+          do lm = 1, nylm
+            y(lm,isph) = y(lm,isph) - f*basis(indlm,its)/facl(lm)
+          end do
+        end do
       end if
     end do
   end do
