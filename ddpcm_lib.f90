@@ -14,7 +14,26 @@ logical :: dodiag
 
 contains
 
-  subroutine ddpcm(phi, psi, do_adjoint, esolv)
+  subroutine ddpcm_init()
+  ! initialize ddpcm module by allocating the preconditioner and
+  ! various arrays, then build the preconditioner
+  implicit none
+  integer :: istatus
+  allocate(rx_prc(nbasis,nbasis,nsph),s(nbasis,nsph),y(nbasis,nsph), &
+    & xs(nbasis,nsph),phieps(nbasis,nsph),stat=istatus)
+  if (istatus.ne.0) write(6,*) 'ddpcm allocation failed'
+  call mkprec
+  end subroutine ddpcm_init
+
+  subroutine ddpcm_finalize()
+  ! deallocate various arrays
+  implicit none
+  integer :: istatus
+  deallocate(rx_prc,s,y,xs,phieps,stat=istatus)
+  if (istatus.ne.0) write(6,*) 'ddpcm deallocation failed'
+  end subroutine ddpcm_finalize
+
+  subroutine ddpcm(do_adjoint, phi, psi, esolv)
   ! main ddpcm driver, given the potential at the exposed cavity
   ! points and the psi vector, computes the solvation energy
   implicit none
@@ -26,20 +45,10 @@ contains
   logical :: ok
   external :: lx, ldm1x, lstarx, hnorm
   
-  allocate(rx_prc(nbasis,nbasis,nsph))
-  allocate(rhs(nbasis,nsph),phieps(nbasis,nsph),xs(nbasis,nsph))
-  allocate(g(ngrid,nsph))
-  allocate(s(nbasis,nsph),y(nbasis,nsph))
+  allocate(rhs(nbasis,nsph),g(ngrid,nsph))
   tol = 10.0d0**(-iconv)
 
-  ! build the preconditioner
-  call mkprec
-
-  ! build the RHS
-  !write(6,*) 'pot', ncav
-  !do isph = 1, ncav
-  !  write(6,*) phi(isph)
-  !end do
+  ! build RHS
   g = zero
   xs = zero
   call wghpot(phi,g)
@@ -47,13 +56,9 @@ contains
     call intrhs(isph,g(:,isph),xs(:,isph))
   end do
 
-  ! call prtsph('phi',nsph,0,xs)
-  ! call prtsph('psi',nsph,0,psi)
-
   ! rinf rhs
   dodiag = .true.
   call rinfx(nbasis*nsph,xs,rhs)
-  ! call prtsph('rhs',nsph,0,rhs)
 
   ! solve the ddpcm linear system
   n_iter = 200
@@ -62,7 +67,6 @@ contains
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
   write(6,*) 'ddpcm step iterations:', n_iter
-  ! call prtsph('phie',nsph,0,phieps)
 
   ! solve the ddcosmo linear system
   n_iter = 200
@@ -70,7 +74,6 @@ contains
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
       & ok,lx,ldm1x,hnorm)
   write(6,*) 'ddcosmo step iterations:', n_iter
-  ! call prtsph('x',nsph,0,xs)
 
   ! compute the energy
   esolv = pt5*sprod(nsph*nbasis,xs,psi)
@@ -96,7 +99,6 @@ contains
     y = s + fac*y
     call prtsph('adjoint ddpcm solution',nsph,0,y)
   end if
-  return
   end subroutine ddpcm
 
 

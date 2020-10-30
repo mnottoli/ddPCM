@@ -1,6 +1,6 @@
 program main
 use ddcosmo
-use ddpcm_lib, only: ddpcm
+use ddpcm_lib, only: ddpcm, ddpcm_init, ddpcm_finalize
 ! 
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
 !      888      888 d88P  Y88b d88P" "Y88b d88P  Y88b 8888b   d8888 d88P" "Y88b 
@@ -183,10 +183,11 @@ call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 ! now, call the ddcosmo solver
 !
 allocate (sigma(nbasis,n))
+call ddpcm_init()
 !
 ! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 time = omp_get_wtime()
-call ddpcm(phi,psi,.true.,esolv)
+call ddpcm(.false.,phi,psi,esolv)
 write(6,*) 'ddpcm esolv:  ', esolv
 write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
 time = omp_get_wtime()
@@ -197,6 +198,7 @@ write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
 if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
 !
 write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
+call ddpcm_finalize()
 stop
 !
 ! this is all for the energy. if the forces are also required, call the solver for
