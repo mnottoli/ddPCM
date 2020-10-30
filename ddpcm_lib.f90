@@ -2,8 +2,8 @@ module ddpcm_lib
 use ddcosmo, only: nbasis, nsph, ngrid, ncav, lmax, iconv, iprint, &
     & wghpot, intrhs, prtsph, zero, pt5, one, two, four, pi, basis, &
     & eps, csph, rsph, grid, w, ui, ndiis, sprod, ylmbas, facl, ddmkxi, &
-    & ptcart
-!use ddcosmo
+    & ptcart, fdoka, fdokb, fdoga, nsph
+
 implicit none
 
 real*8, allocatable :: rx_prc(:,:,:)
@@ -400,5 +400,53 @@ contains
       & x(:,isph),nbasis,zero,y(:,isph),nbasis)
   end do
   end subroutine apply_rstarx_prec
+
+  subroutine ddpcm_forces(phi,fx)
+  ! compute the geometrical contribution to the forces
+  implicit none
+  real*8, intent(in) :: phi(ncav)
+  real*8, intent(inout) :: fx(3,nsph)
+  real*8, allocatable :: vsin(:), vcos(:), vplm(:), basloc(:,:), &
+    & dbsloc(:,:,:), xi(:,:), phiexp(:,:)
+  integer :: ii, isph, ig
+
+  ! expand the adjoint
+  !$omp parallel do default(shared) private(isph,ig)
+  do isph = 1, nsph
+    do ig = 1, ngrid
+      xi(ig,isph) = dot_product(s(:,isph),basis(:,ig))
+    end do
+  end do
+  !$omp end parallel do
+
+  ! expand the potential on a sphere-by-sphere basis (needed for parallelism):
+  ii = 0
+  phiexp = zero
+  do isph = 1, nsph
+    do ig = 1, ngrid
+      if (ui(ig,isph).gt.zero) then
+        ii = ii + 1
+        phiexp(ig,isph) = phi(ii)
+      end if
+    end do
+  end do
+
+  ! compute the geometrical contributions from the ddcosmo matrix
+  ! (fdoka, fdokb), from the ddpcm matrix (gradr) and from the
+  ! geometrical part of the rhs (fdoga) 
+  fx = zero
+  do isph = 1, nsph
+    call fdoka(isph,xs,xi(:,isph),basloc,dbsloc,vplm,vcos,vsin,fx(:,isph)) 
+    call fdokb(isph,xs,xi,basloc,dbsloc,vplm,vcos,vsin,fx(:,isph)) 
+    call gradr()
+    call fdoga(isph,xi,phiexp,fx(:,isph)) 
+  end do
+
+  fx = pt5*fx
+  end subroutine ddpcm_forces
+
+  subroutine gradr()
+  implicit none
+  end subroutine gradr
 
 end module ddpcm_lib

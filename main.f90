@@ -1,6 +1,6 @@
 program main
 use ddcosmo
-use ddpcm_lib, only: ddpcm, ddpcm_init, ddpcm_finalize
+use ddpcm_lib, only: ddpcm, ddpcm_init, ddpcm_finalize, ddpcm_forces
 ! 
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
 !      888      888 d88P  Y88b d88P" "Y88b d88P  Y88b 8888b   d8888 d88P" "Y88b 
@@ -122,6 +122,7 @@ real*8, allocatable :: fx(:,:), zeta(:), ef(:,:)
 !
 ! here, we read all the ddcosmo parameters from a file named Input.txt
 !
+logical :: do_adjoint
 open (unit=100,file='Input.txt',form='formatted',access='sequential')
 !
 ! scalar parameters. the variables are defined in the ddcosmo module and are common to
@@ -180,80 +181,55 @@ call mkrhs(n,charge,x,y,z,ncav,ccav,phi,nbasis,psi)
 !
 ! --------------------------   end modify   --------------------------  
 !
-! now, call the ddcosmo solver
+! now, call the solver
 !
-allocate (sigma(nbasis,n))
+do_adjoint = igrad.eq.1
 call ddpcm_init()
-!
-! call cosmo(.false., .true., phi, xx, psi, sigma, esolv)
 time = omp_get_wtime()
-call ddpcm(.false.,phi,psi,esolv)
+call ddpcm(do_adjoint,phi,psi,esolv)
 write(6,*) 'ddpcm esolv:  ', esolv
 write(6,*) 'ddpcm time:   ', omp_get_wtime() - time
-time = omp_get_wtime()
-call cosmo(.false.,.true.,phi, xx, psi, sigma, esolv)
-write(6,*) 'ddcosmo esolv:', esolv
-write(6,*) 'ddcosmo time:   ', omp_get_wtime() - time
-!
-if (iprint.ge.3) call prtsph('solution to the ddCOSMO equation',nsph,0,sigma)
-!
-write (6,'(1x,a,f14.6)') 'ddcosmo electrostatic solvation energy (kcal/mol):', esolv*tokcal
-call ddpcm_finalize()
-stop
-!
-! this is all for the energy. if the forces are also required, call the solver for
-! the adjoint problem. 
-! the solution to the adjoint system is required also to compute the Fock matrix 
-! contributions.
-!
+
+! compute forces if required
 if (igrad.eq.1) then
-  write(6,*)
-  allocate (s(nbasis,n))
   allocate (fx(3,n))
-  call cosmo(.true., .false., xx, xx, psi, s, esolv)
-!
-  if (iprint.ge.3) call prtsph('solution to the ddCOSMO adjoint equation',nsph,0,s)
-!
-! now call the routine that computes the ddcosmo specific contributions to the forces.
-!
-  call forces_dd(n,phi,sigma,s,fx)
-!
-! form the "zeta" intermediate
-!
+
+  ! first the geometrical contribution to the forces
+  call ddpcm_forces(phi,fx)
+
+  ! form the "zeta" intermediate 
   allocate (zeta(ncav))
   call ddmkzeta(s,zeta)
-!
-  if (iprint.ge.4) call ptcart('zeta',nsph,0,zeta)
-!
-! --------------------------   modify here  --------------------------  
-!
-! finally, add the contributions that depend on the derivatives of the potential
-! on the derivatives of the potential, i.e., the electric field
-! produced by the solute at the cavity points times the ddcosmo intermediate zeta 
-! and the solute's potential derivatives at the cavity points times zeta. 
-! the two terms are described in JCP, 141, 184108, eqs. 47, 48.
-!
-! for a solute represented by point charges, the two terms can be rearranged as zeta 
-! contracted with the electric field of the solute plus the electric field produced
-! by zeta, which have the physical dimension of a charge, at the nuclei times the 
-! charges. This rearrangement allows one to use fast summations methods, such as the
-! fast multipole method, for this task.
-!
-! a routine for point charges that follows the aformentioned strategy is provided as
-! an example (efld). note that the coordinates should be packed into an array of
-! dimension (3,n). we use csph, as it contains exactly this.
-! the user will need to replace efld with his/her favorite routine.
-!
+
+  ! --------------------------   modify here  --------------------------  
+  !
+  ! finally, add the contributions that depend on the derivatives of the potential
+  ! on the derivatives of the potential, i.e., the electric field
+  ! produced by the solute at the cavity points times the ddcosmo intermediate zeta 
+  ! and the solute's potential derivatives at the cavity points times zeta. 
+  ! the two terms are described in JCP, 141, 184108, eqs. 47, 48.
+  !
+  ! for a solute represented by point charges, the two terms can be rearranged as zeta 
+  ! contracted with the electric field of the solute plus the electric field produced
+  ! by zeta, which have the physical dimension of a charge, at the nuclei times the 
+  ! charges. This rearrangement allows one to use fast summations methods, such as the
+  ! fast multipole method, for this task.
+  !
+  ! a routine for point charges that follows the aformentioned strategy is provided as
+  ! an example (efld). note that the coordinates should be packed into an array of
+  ! dimension (3,n). we use csph, as it contains exactly this.
+  ! the user will need to replace efld with his/her favorite routine.
+  !
   allocate(ef(3,max(n,ncav)))
-!
-! 1. solute's electric field at the cav points times zeta:
-!
-!   compute the electric field
-!
+  !
+  ! 1. solute's electric field at the cav points times zeta:
+  !
+  ! compute the electric field
+  !
   call efld(n,charge,csph,ncav,ccav,ef)
-!
-!   contract it with the zeta intermediate
-!
+  !
+  ! contract it with the zeta intermediate
+  !
   ii = 0
   do isph = 1, nsph
     do ig = 1, ngrid
@@ -263,42 +239,39 @@ if (igrad.eq.1) then
       end if
     end do
   end do
-!
-! 2. "zeta's" electric field at the nuclei times the charges. 
-!
-!   compute the "electric field"
-!
-  call efld(ncav,zeta,ccav,n,csph,ef)
-!
-!   contract it with the solute's charges.
-!
-  do isph = 1, nsph
-    fx(:,isph) = fx(:,isph) - ef(:,isph)*charge(isph)
-  end do
-!
-! for point charges, there is no contribution from the derivatives of the psi vector.
-! for quantum mechanical solutes, such a contribution needs to be handled via a numerical
-! integration.
-!
-! --------------------------   end modify   --------------------------  
-! 
-  deallocate (zeta, ef)
-!
+  !
+  ! 2. "zeta's" electric field at the nuclei times the charges. 
+  !
+  !   compute the "electric field"
+  !
+    call efld(ncav,zeta,ccav,n,csph,ef)
+  !
+  !   contract it with the solute's charges.
+  !
+    do isph = 1, nsph
+      fx(:,isph) = fx(:,isph) - ef(:,isph)*charge(isph)
+    end do
+  !
+  ! for point charges, there is no contribution from the derivatives of the psi vector.
+  ! for quantum mechanical solutes, such a contribution needs to be handled via a numerical
+  ! integration.
+  !
+  ! --------------------------   end modify   --------------------------  
+  
   if (iprint.ge.1) then
     write(iout,2000)
-2000 format(1x,'ddCOSMO forces (atomic units):',/, &
+2000 format(1x,'ddPCM forces (atomic units):',/, &
               1x,' atom',15x,'x',15x,'y',15x,'z')
     do isph = 1, nsph
       write(6,'(1x,i5,3f16.8)') isph, fx(:,isph)
     end do
   end if
+ 
+  deallocate (zeta,ef,fx)
 end if
-!
+
 ! clean up:
-!
-deallocate (x,y,z,rvdw,charge,phi,psi,sigma)
-!
-if (igrad.eq.1) deallocate (s,fx)
+deallocate (x,y,z,rvdw,charge,phi,psi)
 call memfree
-!
-end program main
+call ddpcm_finalize()
+end program
