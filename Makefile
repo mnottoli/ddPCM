@@ -10,7 +10,7 @@ FFLAGS = -O3 -march=native -fopenmp -llapack -lblas
 
 MODS   = ddcosmo.o ddpcm_lib.o
 OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o ddpcm_lib.o forces_dd.o efld.o\
-	matvec.o cosmo.o jacobi_diis.o
+	matvec.o cosmo.o jacobi_diis.o gradr.o
 #
 all:    $(MODS) $(OBJS)
 	$(RunF77) $(FFLAGS) -o main.exe $(OBJS)

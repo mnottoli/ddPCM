@@ -406,9 +406,14 @@ contains
   implicit none
   real*8, intent(in) :: phi(ncav)
   real*8, intent(inout) :: fx(3,nsph)
-  real*8, allocatable :: vsin(:), vcos(:), vplm(:), basloc(:,:), &
-    & dbsloc(:,:,:), xi(:,:), phiexp(:,:)
-  integer :: ii, isph, ig
+  real*8, allocatable :: vsin(:), vcos(:), vplm(:), basloc(:), &
+    & dbsloc(:,:), xi(:,:), phiexp(:,:), phieexp(:,:)
+  integer :: istatus, ii, isph, ig
+
+  allocate(vsin(lmax+1),vcos(lmax+1),vplm(nbasis),basloc(nbasis), &
+    & dbsloc(3,nbasis),xi(Ngrid,nsph),phiexp(ngrid,nsph), &
+    & phieexp(ngrid,nsph),stat=istatus)
+  if (istatus.ne.0) write(6,*) 'ddpcm forces allocation failed'
 
   ! expand the adjoint
   !$omp parallel do default(shared) private(isph,ig)
@@ -431,6 +436,15 @@ contains
     end do
   end do
 
+  ! expand phiexp 
+  !$omp parallel do default(shared) private(isph,ig)
+  do isph = 1, nsph
+    do ig = 1, ngrid
+      phieexp(ig,isph) = dot_product(phieps(:,isph),basis(:,ig))
+    end do
+  end do
+  !$omp end parallel do
+
   ! compute the geometrical contributions from the ddcosmo matrix
   ! (fdoka, fdokb), from the ddpcm matrix (gradr) and from the
   ! geometrical part of the rhs (fdoga) 
@@ -438,15 +452,80 @@ contains
   do isph = 1, nsph
     call fdoka(isph,xs,xi(:,isph),basloc,dbsloc,vplm,vcos,vsin,fx(:,isph)) 
     call fdokb(isph,xs,xi,basloc,dbsloc,vplm,vcos,vsin,fx(:,isph)) 
-    call gradr()
-    call fdoga(isph,xi,phiexp,fx(:,isph)) 
+    call gradr(isph,vplm,vcos,vsin,basloc,dbsloc,phiexp-phieexp,y,fx(:,isph))
+    call fdoga(isph,xi,phiexp-phieexp,fx(:,isph)) 
   end do
 
   fx = pt5*fx
+  deallocate(vsin,vcos,vplm,basloc,dbsloc,xi,phiexp,phieexp,stat=istatus)
+  if (istatus.ne.0) write(6,*) 'ddpcm forces deallocation failed'
   end subroutine ddpcm_forces
 
-  subroutine gradr()
-  implicit none
-  end subroutine gradr
+!  subroutine gradr(isph,vplm,vcos,vsin,basloc,dbsloc,g,y,fx)
+!  ! compute the gradient of ddPCM R and contract it
+!  ! < Y, grad R (PhiE - Phi) >
+!  use ddcosmo, only: inl, nl, se, eta
+!  implicit none
+!  integer, intent(in) :: isph
+!  real*8, intent(inout) :: vplm(nbasis), vcos(lmax+1), vsin(lmax+1), basloc(nbasis), & 
+!    & dbsloc(3,nbasis)
+!  real*8, intent(in) :: g(nbasis,nsph), y(ngrid,nsph)
+!  real*8, intent(inout) :: fx(3)
+!  real*8 :: vik(3), sik(3), vki(3), ski(3), vkj(3), skj(3), vji(3), sji(3), va(3), &
+!    & vb(3), a(3), d(3), jac(3,3), c(3)
+!  real*8 :: gg, fcl, vvki, tlow, thigh, tki
+!  integer its, ik, jsph, ksph, l, m, ind
+!
+!  tlow  = one - pt5*(one - se)*eta
+!  thigh = one + pt5*(one + se)*eta
+!
+!  ! first set of contributions:
+!  ! diagonal block, Kc and part of Kb
+!  do its = 1, ngrid
+!    do ik = inl(isph), inl(isph+1) - 1
+!      ksph = nl(ik)
+!      c = csph(:,ksph) + rsph(ksph)*grid(:,its)
+!      vki = c - csph(:,isph)
+!      vvki = sqrt(dot_product(vki,vki))
+!      tki = vvki/rsph(isph)
+!
+!!     Contributions involving grad I of UK come from the switching
+!!     region.
+!!     Note: UTs avoids contributions from points that are in the
+!!     switching between ISph and KSph but are buried in a third
+!!     sphere.
+!      if ((tki.gt.tlow).and.(tki.lt.thigh) .and. uts(its,ksph).gt.zero) then
+!        ski = vki/vvki
+!
+!        ! diagonal block kk contribution, with k in N(I)
+!        gg = zero
+!        do l = 0, lmax
+!          ind = l*l + l + 1
+!          fac = two*pi/(two*dble(l) + one)
+!          do m = -l, l
+!            gg = gg + fac*basis(ind+m,its)*g(ind+m,ksph)
+!          end do
+!        end do
+!
+!        ! Kc contribution
+!        do jsph = 1, nsph
+!          if (jsph.ne.ksph .and. jsph.ne.isph) then
+!            vkj = c - csph(:,jsph)
+!            vvkj = sqrt(dot_product(vkj,vkj))
+!            tkj = vvkj/rsph(jsph)
+!            skj = vkj/vvkj
+!            call ylmbas()
+!            tt = one/tkj
+!            do l = 0, lmax
+!              do m = -l, l
+!              end do
+!            end do
+!          end if
+!        end do
+!      end if
+!    end do
+!  end do
+!
+!  end subroutine gradr
 
 end module ddpcm_lib
