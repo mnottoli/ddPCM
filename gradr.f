@@ -55,8 +55,6 @@ C
 C
 C           Other geometrical quantities
             SKI = VKI/VVKI
-CCC            write(6,*) VKI(1), VKI(2), VKI(3), VVKI, RSph(ISph), TKI,
-CCC     $        SKI(1), SKI(2), SKI(3)
 C
 C           Diagonal block KK contribution, with K in N(I)
             GG = Zero
@@ -66,9 +64,7 @@ C           Diagonal block KK contribution, with K in N(I)
               Fac = Two*Pi/(Two*fL + One)
               Do 21 M = -L, L 
                 GG = GG + Fac*basis(Ind+M,ITs)*G(Ind+M,KSph)
-CCC               Write(6,*) Fac, basis(Ind+M,ITs), G(Ind+M,KSph)
   21            Continue
-CCC           Write(6,*) GG
 C
 C           Kc contribution
             Do 120 JSph = 1, NSph
@@ -92,7 +88,6 @@ C           Kc contribution
   121             Continue
                 End If
   120         Continue
-CCC            Write(6,*) GG
 C
 C
 C           Part of Kb contribution
@@ -106,14 +101,11 @@ C           Part of Kb contribution
   252           Continue
               TT = TT/TKI
   251         Continue
-CCC           Write(6,*) GG
 C
 C
 C           Common step, product with grad I UJ
             dUJ = dFSW(TKI,se,eta)/RSph(ISph)
             FJJ = dUj*w(ITs)*GG*Y(ITs,KSph)
-            write(6,'(7f10.5)') dUj, w(ITs), GG, Y(ITs,KSph), SKI(1),
-     $      SKI(2), SKI(3)
             FX(1) = FX(1) - FJJ*SKI(1)
             FX(2) = FX(2) - FJJ*SKI(2)
             FX(3) = FX(3) - FJJ*SKI(3)

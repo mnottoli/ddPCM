@@ -19,8 +19,12 @@ contains
   implicit none
   integer :: istatus
   allocate(rx_prc(nbasis,nbasis,nsph),s(nbasis,nsph),y(nbasis,nsph), &
-    & xs(nbasis,nsph),phieps(nbasis,nsph),q(nbasis,nsph),stat=istatus)
-  if (istatus.ne.0) write(6,*) 'ddpcm allocation failed'
+    & xs(nbasis,nsph),phieps(nbasis,nsph),q(nbasis,nsph),rhs(nbasis,nsph), &
+    & stat=istatus)
+  if (istatus.ne.0) then
+    write(6,*) 'ddpcm allocation failed'
+    stop
+  end if
   call mkprec
   end subroutine ddpcm_init
 
@@ -28,8 +32,11 @@ contains
   ! deallocate various arrays
   implicit none
   integer :: istatus
-  deallocate(rx_prc,s,y,xs,phieps,q,stat=istatus)
-  if (istatus.ne.0) write(6,*) 'ddpcm deallocation failed'
+  deallocate(rx_prc,s,y,xs,phieps,q,rhs,stat=istatus)
+  if (istatus.ne.0) then
+    write(6,*) 'ddpcm deallocation failed'
+    stop
+  end if
   end subroutine ddpcm_finalize
 
   subroutine ddpcm(do_adjoint, phi, psi, esolv)
@@ -45,7 +52,7 @@ contains
   logical :: ok
   external :: lx, ldm1x, lstarx, hnorm
   
-  allocate(phiinf(nbasis,nsph),rhs(nbasis,nsph),g(ngrid,nsph))
+  allocate(phiinf(nbasis,nsph),g(ngrid,nsph))
   tol = 10.0d0**(-iconv)
 
   ! build RHS
@@ -66,15 +73,15 @@ contains
   phieps = xs
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phiinf,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
-  write(6,*) 'ddpcm step iterations:', n_iter
+  if (iprint.ge.1) write(6,*) 'ddpcm step iterations:', n_iter
 
   ! solve the ddcosmo linear system
   n_iter = 200
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
       & ok,lx,ldm1x,hnorm)
-  call prtsph('X',nsph,0,xs)
-  write(6,*) 'ddcosmo step iterations:', n_iter
+  if (iprint.ge.2) call prtsph('X',nsph,0,xs)
+  if (iprint.ge.1) write(6,*) 'ddcosmo step iterations:', n_iter
 
   ! compute the energy
   esolv = pt5*sprod(nsph*nbasis,xs,psi)
@@ -86,24 +93,23 @@ contains
     dodiag = .false.
     call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,psi,s,n_iter, &
       & ok,lstarx,ldm1x,hnorm)
-    call prtsph('S',nsph,0,s)
+    if (iprint.ge.2) call prtsph('S',nsph,0,s)
 
     ! solve ddpcm adjoint system
     n_iter = 200
     dodiag = .false.
     call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,s,y,n_iter, &
       & ok,rstarx,apply_rstarx_prec,hnorm)
-    call prtsph('Y',nsph,0,y)
+    if (iprint.ge.2) call prtsph('Y',nsph,0,y)
 
     ! recover effect of Rinf^*
     fac = two*pi*(one - (eps + one)/(eps - one))
     q = s + fac*y
 
-    call prtsph('Q',nsph,0,q)
+    if (iprint.ge.2) call prtsph('Q',nsph,0,q)
   end if
-  deallocate(g,phiinf)
+  deallocate(phiinf,g)
   end subroutine ddpcm
-
 
   subroutine mkprec
   ! Assemble the diagonal blocks of the Reps matrix
@@ -417,10 +423,10 @@ contains
   ! debug
   real*8, allocatable :: fscr(:,:)
   real*8 :: fac
-  allocate(fscr(3,nsph),f(nbasis,nsph))
+  allocate(fscr(3,nsph))
   allocate(vsin(lmax+1),vcos(lmax+1),vplm(nbasis),basloc(nbasis), &
-    & dbsloc(3,nbasis),scr(ngrid,nsph),phiexp(ngrid,nsph), &
-    & phieexp(ngrid,nsph),ycr(ngrid,nsph),qcr(ngrid,nsph),stat=istatus)
+    & dbsloc(3,nbasis),scr(ngrid,nsph), &
+    & phiexp(ngrid,nsph),ycr(ngrid,nsph),qcr(ngrid,nsph),stat=istatus)
   if (istatus.ne.0) write(6,*) 'ddpcm forces allocation failed'
 
   fx = zero
@@ -457,34 +463,40 @@ contains
   write(6,*) 'FDOKA'
   do isph = 1, nsph
     call fdoka(isph,xs,scr(:,isph),basloc,dbsloc,vplm,vcos,vsin,fscr(:,isph)) 
-    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+    write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
   end do
   fx = fx + fscr
   fscr = zero
   write(6,*) 'FDOKB'
   do isph = 1, nsph
     call fdokb(isph,xs,scr,basloc,dbsloc,vplm,vcos,vsin,fscr(:,isph)) 
-    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+    write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
   end do
   fx = fx + fscr
   fscr = zero
   write(6,*) 'GRADR'
   do isph = 1, nsph
     call gradr(isph,vplm,vcos,vsin,basloc,dbsloc,rhs-phieps,ycr,fscr(:,isph))
-    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+    write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
   end do
   fx = fx + fscr
   fscr = zero
   write(6,*) 'FDOGA'
   do isph = 1, nsph
-    call fdoga(isph,qcr,-phiexp,fscr(:,isph)) 
-    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+    call fdoga(isph,qcr,phiexp,fscr(:,isph)) 
+    write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
+  end do
+  fx = fx + fscr
+
+  fx = -pt5*fx
+
+  write(6,*) 'Geometrical forces'
+  do isph = 1, nsph
+    write(6,'(1x,i5,3f16.8)') isph, fx(:,isph)
   end do
 
-  fx = pt5*fx
-  deallocate(vsin,vcos,vplm,basloc,dbsloc,scr,phiexp,phieexp,stat=istatus)
+  deallocate(vsin,vcos,vplm,basloc,dbsloc,scr,phiexp,ycr,qcr,stat=istatus)
   if (istatus.ne.0) write(6,*) 'ddpcm forces deallocation failed'
-  deallocate(rhs,f)
   ! debug
   deallocate(fscr)
   end subroutine ddpcm_forces
@@ -500,11 +512,11 @@ contains
     do its = 1, ngrid
       if (ui(its,isph) .gt. zero) then
         ii = ii + 1
-        zeta(ii) = w(its)*ui(its,isph)*dot_product(basis(:,its),y(:,isph))
+        zeta(ii) = w(its)*ui(its,isph)*dot_product(basis(:,its),q(:,isph))
       end if
     end do
   end do
-  zeta = pt5*zeta 
+  zeta = -pt5*zeta 
   end subroutine ddpcm_zeta
 
 !  subroutine gradr(isph,vplm,vcos,vsin,basloc,dbsloc,g,y,fx)

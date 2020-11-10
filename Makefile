@@ -9,11 +9,12 @@ FFLAGS = -O3 -march=native -fopenmp -llapack -lblas
 #FFLAGS = -O3 -mp
 
 MODS   = ddcosmo.o ddpcm_lib.o
-OBJS   = mkrhs.o llgnew.o main.o ddcosmo.o ddpcm_lib.o forces_dd.o efld.o\
+OBJS   = mkrhs.o llgnew.o ddcosmo.o ddpcm_lib.o forces_dd.o efld.o\
 	matvec.o cosmo.o jacobi_diis.o gradr.o
 #
-all:    $(MODS) $(OBJS)
-	$(RunF77) $(FFLAGS) -o main.exe $(OBJS)
+all:    $(MODS) $(OBJS) numgrad.o main.o
+	$(RunF77) $(FFLAGS) -o numgrad.exe $(OBJS) numgrad.o
+	$(RunF77) $(FFLAGS) -o main.exe $(OBJS) main.o
 #
 %.o: %.f
 	$(RunF77) $(FFLAGS) -c $*.f
