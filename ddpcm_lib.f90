@@ -55,7 +55,7 @@ contains
   allocate(phiinf(nbasis,nsph),g(ngrid,nsph))
   tol = 10.0d0**(-iconv)
 
-  ! build RHS
+  ! build rhs
   g = zero
   xs = zero
   call wghpot(phi,g)
@@ -80,7 +80,7 @@ contains
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
       & ok,lx,ldm1x,hnorm)
-  if (iprint.ge.2) call prtsph('X',nsph,0,xs)
+  if (iprint.ge.2) call prtsph('x',nsph,0,xs)
   if (iprint.ge.1) write(6,*) 'ddcosmo step iterations:', n_iter
 
   ! compute the energy
@@ -93,26 +93,26 @@ contains
     dodiag = .false.
     call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,psi,s,n_iter, &
       & ok,lstarx,ldm1x,hnorm)
-    if (iprint.ge.2) call prtsph('S',nsph,0,s)
+    if (iprint.ge.2) call prtsph('s',nsph,0,s)
 
     ! solve ddpcm adjoint system
     n_iter = 200
     dodiag = .false.
     call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,s,y,n_iter, &
       & ok,rstarx,apply_rstarx_prec,hnorm)
-    if (iprint.ge.2) call prtsph('Y',nsph,0,y)
+    if (iprint.ge.2) call prtsph('y',nsph,0,y)
 
-    ! recover effect of Rinf^*
+    ! recover effect of rinf^*
     fac = two*pi*(one - (eps + one)/(eps - one))
     q = s + fac*y
 
-    if (iprint.ge.2) call prtsph('Q',nsph,0,q)
+    if (iprint.ge.2) call prtsph('q',nsph,0,q)
   end if
   deallocate(phiinf,g)
   end subroutine ddpcm
 
   subroutine mkprec
-  ! Assemble the diagonal blocks of the Reps matrix
+  ! assemble the diagonal blocks of the reps matrix
   ! then invert them to build the preconditioner
   implicit none
   integer :: isph, lm, ind, l1, m1, ind1, its, istatus
@@ -155,15 +155,15 @@ contains
 
   ! invert the blocks
   do isph = 1, nsph
-    call DGETRF(nbasis,nbasis,rx_prc(:,:,isph),nbasis,ipiv,istatus)
+    call dgetrf(nbasis,nbasis,rx_prc(:,:,isph),nbasis,ipiv,istatus)
     if (istatus.ne.0) then 
-      write(6,*) 'LU failed in mkprc'
+      write(6,*) 'lu failed in mkprc'
       stop
     end if
-    call DGETRI(nbasis,rx_prc(:,:,isph),nbasis,ipiv,work, &
+    call dgetri(nbasis,rx_prc(:,:,isph),nbasis,ipiv,work, &
         & nbasis*nbasis,istatus)
     if (istatus.ne.0) then 
-      write(6,*) 'Inversion failed in mkprc'
+      write(6,*) 'inversion failed in mkprc'
       stop
     end if
   end do
@@ -178,8 +178,8 @@ contains
 
 
   subroutine rx(n,x,y)
-  ! Computes Y = Reps X =
-  ! = (2*pi*(eps + 1)/(eps - 1) - D) X 
+  ! computes y = reps x =
+  ! = (2*pi*(eps + 1)/(eps - 1) - d) x 
   implicit none
   integer, intent(in) :: n
   real*8, intent(in) :: x(nbasis,nsph)
@@ -197,8 +197,8 @@ contains
 
 
   subroutine rinfx(n,x,y)
-  ! Computes Y = Rinf X = 
-  ! = (2*pi -  D) X
+  ! computes y = rinf x = 
+  ! = (2*pi -  d) x
   implicit none
   integer, intent(in) :: n
   real*8, intent(in) :: x(nbasis,nsph)
@@ -216,7 +216,7 @@ contains
 
   
   subroutine dx(n,x,y)
-  ! Computes Y = D X
+  ! computes y = d x
   implicit none
   integer, intent(in) :: n
   real*8, intent(in) :: x(nbasis,nsph)
@@ -242,7 +242,7 @@ contains
   !$omp lmax,fourpi,dodiag,x,y,basis)
   do isph = 1, nsph
     ! compute the "potential" from the other spheres
-    ! at the exposed Lebedv points of the i-th sphere 
+    ! at the exposed lebedv points of the i-th sphere 
     vts = zero
     do its = 1, ngrid
       if (ui(its,isph).gt.zero) then
@@ -311,8 +311,8 @@ contains
   end subroutine apply_rx_prec
 
   subroutine rstarx(n,x,y)
-  ! Computes Y = Reps X =
-  ! = (2*pi*(eps + 1)/(eps - 1) - D^*) X 
+  ! computes y = reps x =
+  ! = (2*pi*(eps + 1)/(eps - 1) - d^*) x 
   implicit none
   integer, intent(in) :: n
   real*8, intent(in) :: x(nbasis,nsph)
@@ -329,7 +329,7 @@ contains
   end subroutine rstarx
 
   subroutine dstarx(n,x,y)
-  ! Computes Y = D^* X
+  ! computes y = d^* x
   implicit none
   integer, intent(in) :: n
   real*8, intent(in) :: x(nbasis,nsph)
@@ -460,28 +460,28 @@ contains
   ! geometrical part of the rhs (fdoga) 
   fx = zero
   fscr = zero
-  write(6,*) 'FDOKA'
+  write(6,*) 'fdoka'
   do isph = 1, nsph
     call fdoka(isph,xs,scr(:,isph),basloc,dbsloc,vplm,vcos,vsin,fscr(:,isph)) 
     write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
   end do
   fx = fx + fscr
   fscr = zero
-  write(6,*) 'FDOKB'
+  write(6,*) 'fdokb'
   do isph = 1, nsph
     call fdokb(isph,xs,scr,basloc,dbsloc,vplm,vcos,vsin,fscr(:,isph)) 
     write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
   end do
   fx = fx + fscr
   fscr = zero
-  write(6,*) 'GRADR'
+  write(6,*) 'gradr'
   do isph = 1, nsph
     call gradr(isph,vplm,vcos,vsin,basloc,dbsloc,rhs-phieps,ycr,fscr(:,isph))
     write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
   end do
   fx = fx + fscr
   fscr = zero
-  write(6,*) 'FDOGA'
+  write(6,*) 'fdoga'
   do isph = 1, nsph
     call fdoga(isph,qcr,phiexp,fscr(:,isph)) 
     write(6,'(1x,i5,3f16.8)') isph, -pt5*fscr(:,isph)
@@ -490,7 +490,7 @@ contains
 
   fx = -pt5*fx
 
-  write(6,*) 'Geometrical forces'
+  write(6,*) 'geometrical forces'
   do isph = 1, nsph
     write(6,'(1x,i5,3f16.8)') isph, fx(:,isph)
   end do
@@ -519,71 +519,278 @@ contains
   zeta = -pt5*zeta 
   end subroutine ddpcm_zeta
 
-!  subroutine gradr(isph,vplm,vcos,vsin,basloc,dbsloc,g,y,fx)
-!  ! compute the gradient of ddPCM R and contract it
-!  ! < Y, grad R (PhiE - Phi) >
-!  use ddcosmo, only: inl, nl, se, eta
-!  implicit none
-!  integer, intent(in) :: isph
-!  real*8, intent(inout) :: vplm(nbasis), vcos(lmax+1), vsin(lmax+1), basloc(nbasis), & 
-!    & dbsloc(3,nbasis)
-!  real*8, intent(in) :: g(nbasis,nsph), y(ngrid,nsph)
-!  real*8, intent(inout) :: fx(3)
-!  real*8 :: vik(3), sik(3), vki(3), ski(3), vkj(3), skj(3), vji(3), sji(3), va(3), &
-!    & vb(3), a(3), d(3), jac(3,3), c(3)
-!  real*8 :: gg, fcl, vvki, tlow, thigh, tki
-!  integer its, ik, jsph, ksph, l, m, ind
-!
-!  tlow  = one - pt5*(one - se)*eta
-!  thigh = one + pt5*(one + se)*eta
-!
-!  ! first set of contributions:
-!  ! diagonal block, Kc and part of Kb
-!  do its = 1, ngrid
-!    do ik = inl(isph), inl(isph+1) - 1
-!      ksph = nl(ik)
-!      c = csph(:,ksph) + rsph(ksph)*grid(:,its)
-!      vki = c - csph(:,isph)
-!      vvki = sqrt(dot_product(vki,vki))
-!      tki = vvki/rsph(isph)
-!
-!!     Contributions involving grad I of UK come from the switching
-!!     region.
-!!     Note: UTs avoids contributions from points that are in the
-!!     switching between ISph and KSph but are buried in a third
-!!     sphere.
-!      if ((tki.gt.tlow).and.(tki.lt.thigh) .and. uts(its,ksph).gt.zero) then
-!        ski = vki/vvki
-!
-!        ! diagonal block kk contribution, with k in N(I)
-!        gg = zero
-!        do l = 0, lmax
-!          ind = l*l + l + 1
-!          fac = two*pi/(two*dble(l) + one)
-!          do m = -l, l
-!            gg = gg + fac*basis(ind+m,its)*g(ind+m,ksph)
-!          end do
-!        end do
-!
-!        ! Kc contribution
-!        do jsph = 1, nsph
-!          if (jsph.ne.ksph .and. jsph.ne.isph) then
-!            vkj = c - csph(:,jsph)
-!            vvkj = sqrt(dot_product(vkj,vkj))
-!            tkj = vvkj/rsph(jsph)
-!            skj = vkj/vvkj
-!            call ylmbas()
-!            tt = one/tkj
-!            do l = 0, lmax
-!              do m = -l, l
-!              end do
-!            end do
-!          end if
-!        end do
-!      end if
-!    end do
-!  end do
-!
-!  end subroutine gradr
+  subroutine gradr(isph,vplm,vcos,vsin,basloc,dbsloc,g,y,fx)
+  use ddcosmo
+  implicit none
+  ! compute the gradient of ddpcm r and contract it
+  ! < y, grad r (phie - phi) >
+
+  ! physical quantities
+  real*8 :: g(nbasis,*), y(ngrid,*), fx(*)
+  ! various scratch arrays
+  real*8 vik(3), sik(3), vki(3), ski(3), vkj(3), skj(3), vji(3), &
+    & sji(3), va(3), vb(3), a(3), d(3)
+  ! jacobian matrix
+  real*8 sjac(3,3)
+  ! other scratch arrays
+  real*8 vplm(*), vcos(*), vsin(*), basloc(*), dbsloc(3,*)
+  ! indexes
+  integer isph, its, ik, ksph, l, m, ind, jsph, icomp, jcomp
+  ! various scalar quantities
+  real*8 cx, cy, cz, vvki, tki, gg, fl, fac, vvkj, tkj
+  real*8 tt, fcl, dij, fjj, gi, fii, vvji, tji, qji
+  real*8 b, vvik, tik, qik, tlow, thigh, duj
+
+  tlow  = one - pt5*(one - se)*eta
+  thigh = one + pt5*(one + se)*eta
+
+  ! first set of contributions:
+  ! diagonal block, kc and part of kb
+
+  do its = 1, ngrid
+    ! sum over ksph in neighbors of isph
+    do ik = inl(isph), inl(isph+1) - 1
+      ksph = nl(ik)
+      ! build geometrical quantities
+      cx = csph(1,ksph) + rsph(ksph)*grid(1,its)
+      cy = csph(2,ksph) + rsph(ksph)*grid(2,its)
+      cz = csph(3,ksph) + rsph(ksph)*grid(3,its)
+      vki(1) = cx - csph(1,isph)
+      vki(2) = cy - csph(2,isph)
+      vki(3) = cz - csph(3,isph)
+      vvki = sqrt(vki(1)*vki(1) + vki(2)*vki(2) + &
+        & vki(3)*vki(3))
+      tki  = vvki/rsph(isph)
+
+      ! contributions involving grad i of uk come from the switching
+      ! region.
+      ! note: ui avoids contributions from points that are in the
+      ! switching between isph and ksph but are buried in a third
+      ! sphere.
+      if ((tki.gt.tlow).and.(tki.lt.thigh) .and. &
+        & ui(its,ksph).gt.zero) then
+        ! other geometrical quantities
+        ski = vki/vvki
+
+        ! diagonal block kk contribution, with k in n(i)
+        gg = zero
+        do l = 0, lmax
+          ind = l*l + l + 1
+          fl = dble(l)
+          fac = two*pi/(two*fl + one)
+          do m = -l, l 
+            gg = gg + fac*basis(ind+m,its)*g(ind+m,ksph)
+          end do
+        end do
+
+        ! kc contribution
+        do jsph = 1, nsph
+          if (jsph.ne.ksph .and. jsph.ne.isph) then 
+            vkj(1) = cx - csph(1,jsph)
+            vkj(2) = cy - csph(2,jsph)
+            vkj(3) = cz - csph(3,jsph)
+            vvkj = sqrt(vkj(1)*vkj(1) + vkj(2)*vkj(2) + &
+              & vkj(3)*vkj(3))
+            tkj  = vvkj/rsph(jsph)
+            skj  = vkj/vvkj
+            call ylmbas(skj,basloc,vplm,vcos,vsin)
+            tt = one/tkj
+            do l = 0, lmax
+              ind = l*l + l + 1
+              fcl = - four*pi*dble(l)/(two*dble(l)+one)*tt
+              do m = -l, l
+                gg = gg + fcl*g(ind+m,jsph)*basloc(ind+m)
+              end do
+              tt = tt/tkj
+            end do
+          end if
+        end do
+
+        ! part of kb contribution
+        call ylmbas(ski,basloc,vplm,vcos,vsin)
+        tt = one/tki
+        do l = 0, lmax
+          ind = l*l + l + 1
+          fcl = - four*pi*dble(l)/(two*dble(l)+one)*tt
+          do m = -l, l
+            gg = gg + fcl*g(ind+m,isph)*basloc(ind+m)
+          end do
+          tt = tt/tki
+        end do
+
+        ! common step, product with grad i uj
+        duj = dfsw(tki,se,eta)/rsph(isph)
+        fjj = duj*w(its)*gg*y(its,ksph)
+        fx(1) = fx(1) - fjj*ski(1)
+        fx(2) = fx(2) - fjj*ski(2)
+        fx(3) = fx(3) - fjj*ski(3)
+      end if
+    end do
+
+    ! diagonal block ii contribution
+    if (ui(its,isph).gt.zero.and.ui(its,isph).lt.one) then
+      gi = zero
+      do l = 0, lmax
+        ind = l*l + l + 1
+        fl = dble(l)
+        fac = two*pi/(two*fl + one)
+        do m = -l, l 
+          gi = gi + fac*basis(ind+m,its)*g(ind+m,isph)
+        end do
+      end do
+      fii = w(its)*gi*y(its,isph)
+      fx(1) = fx(1) + fii*zi(1,its,isph)
+      fx(2) = fx(2) + fii*zi(2,its,isph)
+      fx(3) = fx(3) + fii*zi(3,its,isph)
+    end if
+  end do
+
+  ! second set of contributions:
+  ! part of kb and ka
+  do its = 1, ngrid
+
+    ! run over all the spheres except isph 
+    do jsph = 1, nsph
+      if (ui(its,jsph).gt.zero .and. jsph.ne.isph) then
+        ! build geometrical quantities
+        cx = csph(1,jsph) + rsph(jsph)*grid(1,its)
+        cy = csph(2,jsph) + rsph(jsph)*grid(2,its)
+        cz = csph(3,jsph) + rsph(jsph)*grid(3,its)
+        vji(1) = cx - csph(1,isph)
+        vji(2) = cy - csph(2,isph)
+        vji(3) = cz - csph(3,isph)
+        vvji = sqrt(vji(1)*vji(1) + vji(2)*vji(2) + &
+          &  vji(3)*vji(3))
+        tji = vvji/rsph(isph)
+        qji = one/vvji
+        sji = vji/vvji
+
+        ! build the jacobian of sji
+        sjac = zero
+        sjac(1,1) = - one
+        sjac(2,2) = - one
+        sjac(3,3) = - one
+        do icomp = 1, 3
+          do jcomp = 1, 3
+            sjac(icomp,jcomp) = qji*(sjac(icomp,jcomp) &
+              & + sji(icomp)*sji(jcomp))
+          end do
+        end do
+
+        ! assemble the local basis and its gradient
+        call dbasis(sji,basloc,dbsloc,vplm,vcos,vsin)
+
+        ! assemble the contribution
+        a = zero
+        tt = one/(tji)
+        do l = 0, lmax
+          ind = l*l + l + 1
+          fl = dble(l)
+          fcl = - tt*four*pi*fl/(two*fl + one)
+          do m = -l, l
+            fac = fcl*g(ind+m,isph)
+            b = (fl + one)*basloc(ind+m)/(rsph(isph)*tji)
+
+            ! apply the jacobian to grad y
+            va(1) = sjac(1,1)*dbsloc(1,ind+m) + &
+              & sjac(1,2)*dbsloc(2,ind+m) + sjac(1,3)*dbsloc(3,ind+m)
+            va(2) = sjac(2,1)*dbsloc(1,ind+m) + &
+              & sjac(2,2)*dbsloc(2,ind+m) + sjac(2,3)*dbsloc(3,ind+m)
+            va(3) = sjac(3,1)*dbsloc(1,ind+m) + &
+              & sjac(3,2)*dbsloc(2,ind+m) + sjac(3,3)*dbsloc(3,ind+m)
+            a(1) = a(1) + fac*(sji(1)*b + va(1))
+            a(2) = a(2) + fac*(sji(2)*b + va(2))
+            a(3) = a(3) + fac*(sji(3)*b + va(3))
+          end do
+          tt = tt/tji
+        end do
+        fac = ui(its,jsph)*w(its)*y(its,jsph)
+        fx(1) = fx(1) - fac*a(1)
+        fx(2) = fx(2) - fac*a(2)
+        fx(3) = fx(3) - fac*a(3)
+      end if
+    end do
+  end do
+
+  ! ka contribution
+  do its = 1, ngrid
+    cx = csph(1,isph) + rsph(isph)*grid(1,its)
+    cy = csph(2,isph) + rsph(isph)*grid(2,its)
+    cz = csph(3,isph) + rsph(isph)*grid(3,its)
+    a = zero
+
+    ! iterate on all the spheres except isph
+    do ksph = 1, nsph
+      if (ui(its,isph).gt.zero .and. ksph.ne.isph) then
+        ! geometrical stuff
+        vik(1) = cx - csph(1,ksph)
+        vik(2) = cy - csph(2,ksph)
+        vik(3) = cz - csph(3,ksph)
+        vvik = sqrt(vik(1)*vik(1) + vik(2)*vik(2) + & 
+          & vik(3)*vik(3))
+        tik = vvik/rsph(ksph)
+        qik = one/vvik
+        sik = vik/vvik
+
+        ! build the jacobian of sik
+        sjac = zero
+        sjac(1,1) = one
+        sjac(2,2) = one
+        sjac(3,3) = one
+        do icomp = 1, 3
+          do jcomp = 1, 3
+            sjac(icomp,jcomp) = qik*(sjac(icomp,jcomp) &
+              & - sik(icomp)*sik(jcomp))
+          end do
+        end do
+
+        ! if we are in the switching region, recover grad_i u_i
+        vb = zero
+        if (ui(its,isph).lt.one) then
+          vb(1) = zi(1,its,isph)
+          vb(2) = zi(2,its,isph)
+          vb(3) = zi(3,its,isph)
+        end if
+
+        ! assemble the local basis and its gradient
+        call dbasis(sik,basloc,dbsloc,vplm,vcos,vsin)
+
+        ! assemble the contribution
+        tt = one/(tik)
+        do l = 0, lmax
+          ind = l*l + l + 1
+          fl = dble(l)
+          fcl = - tt*four*pi*fl/(two*fl + one)
+          do m = -l, l
+            fac = fcl*g(ind+m,ksph)
+            fac = - fac*basloc(ind+m)
+            a(1) = a(1) + fac*vb(1)
+            a(2) = a(2) + fac*vb(2) 
+            a(3) = a(3) + fac*vb(3)
+
+            fac = ui(its,isph)*fcl*g(ind+m,ksph)
+            b = - (fl + one)*basloc(ind+m)/(rsph(ksph)*tik)
+
+            ! apply the jacobian to grad y
+            va(1) = sjac(1,1)*dbsloc(1,ind+m) + &
+              & sjac(1,2)*dbsloc(2,ind+m) + sjac(1,3)*dbsloc(3,ind+m)
+            va(2) = sjac(2,1)*dbsloc(1,ind+m) + &
+              & sjac(2,2)*dbsloc(2,ind+m) + sjac(2,3)*dbsloc(3,ind+m)
+            va(3) = sjac(3,1)*dbsloc(1,ind+m) + &
+              & sjac(3,2)*dbsloc(2,ind+m) + sjac(3,3)*dbsloc(3,ind+m)
+            a(1) = a(1) + fac*(sik(1)*b + va(1))
+            a(2) = a(2) + fac*(sik(2)*b + va(2))
+            a(3) = a(3) + fac*(sik(3)*b + va(3))
+          end do
+          tt = tt/tik
+        end do
+      end if
+    end do
+    fac = w(its)*y(its,isph)
+    fx(1) = fx(1) - fac*a(1)
+    fx(2) = fx(2) - fac*a(2)
+    fx(3) = fx(3) - fac*a(3)
+  end do
+  end subroutine gradr
 
 end module ddpcm_lib
