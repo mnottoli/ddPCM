@@ -1,6 +1,6 @@
 program main
 use ddcosmo
-use ddpcm_lib, only: ddpcm, ddpcm_init, ddpcm_finalize, ddpcm_forces
+use ddpcm_lib, only: ddpcm, ddpcm_init, ddpcm_finalize, ddpcm_forces, ddpcm_zeta
 ! 
 !      888      888  .d8888b.   .d88888b.   .d8888b.  888b     d888  .d88888b.  
 !      888      888 d88P  Y88b d88P" "Y88b d88P  Y88b 8888b   d8888 d88P" "Y88b 
@@ -196,10 +196,15 @@ if (igrad.eq.1) then
 
   ! first the geometrical contribution to the forces
   call ddpcm_forces(phi,fx)
+  write(6,*) 'Geometrical forces'
+  do isph = 1, nsph
+    write(6,'(1x,i5,3f16.8)') isph, fx(:,isph)
+  end do
+  
 
   ! form the "zeta" intermediate 
   allocate (zeta(ncav))
-  call ddmkzeta(s,zeta)
+  call ddpcm_zeta(zeta)
 
   ! --------------------------   modify here  --------------------------  
   !

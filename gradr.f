@@ -1,12 +1,12 @@
       subroutine gradR(ISph,VPlm,VCos,VSin,BasLoc,dBsLoc,G,Y,FX)
       use ddcosmo
-      Implicit Real*8 (A-H,O-Z)
+      implicit none
 C
 C     Compute the gradient of ddPCM R and contract it
 C     < Y, grad R (PhiE - Phi) >
 C
 C     Physical quantities
-      Real*8 G(nbasis,*), Y(ngrid,*), FX(*)
+      real*8 G(nbasis,*), Y(ngrid,*), FX(*)
 C     Various scratch arrays
       Real*8 VIK(3), SIK(3), VKI(3), SKI(3), VKJ(3), SKJ(3), VJI(3),
      $  SJI(3), VA(3), VB(3), A(3), D(3)
@@ -14,6 +14,12 @@ C     Jacobian matrix
       Real*8 SJac(3,3)
 C     Other scratch arrays
       Real*8 VPlm(*), VCos(*), VSin(*), BasLoc(*), dBsLoc(3,*)
+      integer isph
+C     indexes and scalars
+      integer its, ik, ksph, l, m, ind, jsph, icomp, jcomp
+      real*8 cx, cy, cz, vvki, tki, gg, fl, fac, vvkj, tkj
+      real*8 tt, fcl, dij, fjj, gi, fii, vvji, tji, qji
+      real*8 b, vvik, tik, qik, tlow, thigh, duj
 C
       tlow  = one - pt5*(one - se)*eta
       thigh = one + pt5*(one + se)*eta
@@ -28,9 +34,9 @@ C       Sum over KSph in neighbors of ISph
           KSph = NL(IK)
 C
 C         Build geometrical quantities
-          Cx = CSph(1,KSph) + RSph(KSph)*grid(1,ITs)
-          Cy = CSph(2,KSph) + RSph(KSph)*grid(2,ITs)
-          Cz = CSph(3,KSph) + RSph(KSph)*grid(3,ITs)
+          cx = CSph(1,KSph) + RSph(KSph)*grid(1,ITs)
+          cy = CSph(2,KSph) + RSph(KSph)*grid(2,ITs)
+          cz = CSph(3,KSph) + RSph(KSph)*grid(3,ITs)
           VKI(1) = Cx - CSph(1,ISph)
           VKI(2) = Cy - CSph(2,ISph)
           VKI(3) = Cz - CSph(3,ISph)
@@ -48,7 +54,9 @@ C
      $      ui(ITs,KSph).gt.Zero) Then
 C
 C           Other geometrical quantities
-            SKI = VJI/VVKI
+            SKI = VKI/VVKI
+CCC            write(6,*) VKI(1), VKI(2), VKI(3), VVKI, RSph(ISph), TKI,
+CCC     $        SKI(1), SKI(2), SKI(3)
 C
 C           Diagonal block KK contribution, with K in N(I)
             GG = Zero
@@ -58,7 +66,9 @@ C           Diagonal block KK contribution, with K in N(I)
               Fac = Two*Pi/(Two*fL + One)
               Do 21 M = -L, L 
                 GG = GG + Fac*basis(Ind+M,ITs)*G(Ind+M,KSph)
+CCC               Write(6,*) Fac, basis(Ind+M,ITs), G(Ind+M,KSph)
   21            Continue
+CCC           Write(6,*) GG
 C
 C           Kc contribution
             Do 120 JSph = 1, NSph
@@ -82,6 +92,8 @@ C           Kc contribution
   121             Continue
                 End If
   120         Continue
+CCC            Write(6,*) GG
+C
 C
 C           Part of Kb contribution
             Call YlmBas(SKI,BasLoc,VPlm,VCos,VSin)
@@ -94,10 +106,14 @@ C           Part of Kb contribution
   252           Continue
               TT = TT/TKI
   251         Continue
+CCC           Write(6,*) GG
+C
 C
 C           Common step, product with grad I UJ
-            dUJ = dFSW(EtaDD,SDD,TKI)/RSph(ISph)
+            dUJ = dFSW(TKI,se,eta)/RSph(ISph)
             FJJ = dUj*w(ITs)*GG*Y(ITs,KSph)
+            write(6,'(7f10.5)') dUj, w(ITs), GG, Y(ITs,KSph), SKI(1),
+     $      SKI(2), SKI(3)
             FX(1) = FX(1) - FJJ*SKI(1)
             FX(2) = FX(2) - FJJ*SKI(2)
             FX(3) = FX(3) - FJJ*SKI(3)
@@ -208,6 +224,7 @@ C           Geometrical stuff
             VVIK = Sqrt(VIK(1)*VIK(1) + VIK(2)*VIK(2) + 
      $        VIK(3)*VIK(3))
             TIK = VVIK/RSph(KSph)
+            QIK = One/VVIK
             SIK = VIK/VVIK
 C
 C           Build the jacobian of SIK

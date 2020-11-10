@@ -8,8 +8,7 @@ implicit none
 
 real*8, allocatable :: rx_prc(:,:,:)
 real*8, allocatable :: rhs(:,:), phieps(:,:), xs(:,:)
-real*8, allocatable :: s(:,:), y(:,:)
-real*8, allocatable :: g(:,:)
+real*8, allocatable :: s(:,:), y(:,:), q(:,:)
 logical :: dodiag
 
 contains
@@ -20,7 +19,7 @@ contains
   implicit none
   integer :: istatus
   allocate(rx_prc(nbasis,nbasis,nsph),s(nbasis,nsph),y(nbasis,nsph), &
-    & xs(nbasis,nsph),phieps(nbasis,nsph),stat=istatus)
+    & xs(nbasis,nsph),phieps(nbasis,nsph),q(nbasis,nsph),stat=istatus)
   if (istatus.ne.0) write(6,*) 'ddpcm allocation failed'
   call mkprec
   end subroutine ddpcm_init
@@ -29,7 +28,7 @@ contains
   ! deallocate various arrays
   implicit none
   integer :: istatus
-  deallocate(rx_prc,s,y,xs,phieps,stat=istatus)
+  deallocate(rx_prc,s,y,xs,phieps,q,stat=istatus)
   if (istatus.ne.0) write(6,*) 'ddpcm deallocation failed'
   end subroutine ddpcm_finalize
 
@@ -42,10 +41,11 @@ contains
   logical, intent(in) :: do_adjoint
   real*8 :: tol, fac
   integer :: isph, n_iter
+  real*8, allocatable :: g(:,:), phiinf(:,:)
   logical :: ok
   external :: lx, ldm1x, lstarx, hnorm
   
-  allocate(rhs(nbasis,nsph),g(ngrid,nsph))
+  allocate(phiinf(nbasis,nsph),rhs(nbasis,nsph),g(ngrid,nsph))
   tol = 10.0d0**(-iconv)
 
   ! build RHS
@@ -53,18 +53,18 @@ contains
   xs = zero
   call wghpot(phi,g)
   do isph = 1, nsph
-    call intrhs(isph,g(:,isph),xs(:,isph))
+    call intrhs(isph,g(:,isph),rhs(:,isph))
   end do
 
   ! rinf rhs
   dodiag = .true.
-  call rinfx(nbasis*nsph,xs,rhs)
+  call rinfx(nbasis*nsph,rhs,phiinf)
 
   ! solve the ddpcm linear system
   n_iter = 200
   dodiag = .false.
   phieps = xs
-  call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,rhs,phieps,n_iter, &
+  call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phiinf,phieps,n_iter, &
       & ok,rx,apply_rx_prec,hnorm)
   write(6,*) 'ddpcm step iterations:', n_iter
 
@@ -73,6 +73,7 @@ contains
   dodiag = .false.
   call jacobi_diis(nsph*nbasis,iprint,ndiis,4,tol,phieps,xs,n_iter, &
       & ok,lx,ldm1x,hnorm)
+  call prtsph('X',nsph,0,xs)
   write(6,*) 'ddcosmo step iterations:', n_iter
 
   ! compute the energy
@@ -96,9 +97,11 @@ contains
 
     ! recover effect of Rinf^*
     fac = two*pi*(one - (eps + one)/(eps - one))
-    y = s + fac*y
-    call prtsph('adjoint ddpcm solution',nsph,0,y)
+    q = s + fac*y
+
+    call prtsph('Q',nsph,0,q)
   end if
+  deallocate(g,phiinf)
   end subroutine ddpcm
 
 
@@ -407,22 +410,32 @@ contains
   real*8, intent(in) :: phi(ncav)
   real*8, intent(inout) :: fx(3,nsph)
   real*8, allocatable :: vsin(:), vcos(:), vplm(:), basloc(:), &
-    & dbsloc(:,:), xi(:,:), phiexp(:,:), phieexp(:,:)
+    & dbsloc(:,:), phiexp(:,:), phieexp(:,:), f(:,:)
+  ! cartesian representation of various adjoint solutions
+  real*8, allocatable :: scr(:,:), ycr(:,:), qcr(:,:)
   integer :: istatus, ii, isph, ig
-
+  ! debug
+  real*8, allocatable :: fscr(:,:)
+  real*8 :: fac
+  allocate(fscr(3,nsph),f(nbasis,nsph))
   allocate(vsin(lmax+1),vcos(lmax+1),vplm(nbasis),basloc(nbasis), &
-    & dbsloc(3,nbasis),xi(Ngrid,nsph),phiexp(ngrid,nsph), &
-    & phieexp(ngrid,nsph),stat=istatus)
+    & dbsloc(3,nbasis),scr(ngrid,nsph),phiexp(ngrid,nsph), &
+    & phieexp(ngrid,nsph),ycr(ngrid,nsph),qcr(ngrid,nsph),stat=istatus)
   if (istatus.ne.0) write(6,*) 'ddpcm forces allocation failed'
 
-  ! expand the adjoint
+  fx = zero
+
+  ! expand the adjoints
   !$omp parallel do default(shared) private(isph,ig)
   do isph = 1, nsph
     do ig = 1, ngrid
-      xi(ig,isph) = dot_product(s(:,isph),basis(:,ig))
+      scr(ig,isph) = dot_product(s(:,isph),basis(:,ig))
+      ycr(ig,isph) = dot_product(y(:,isph),basis(:,ig))
     end do
   end do
   !$omp end parallel do
+  fac = two*pi*(one - (eps + one)/(eps - one))
+  qcr = scr + fac*ycr
 
   ! expand the potential on a sphere-by-sphere basis (needed for parallelism):
   ii = 0
@@ -436,30 +449,63 @@ contains
     end do
   end do
 
-  ! expand phiexp 
-  !$omp parallel do default(shared) private(isph,ig)
-  do isph = 1, nsph
-    do ig = 1, ngrid
-      phieexp(ig,isph) = dot_product(phieps(:,isph),basis(:,ig))
-    end do
-  end do
-  !$omp end parallel do
-
   ! compute the geometrical contributions from the ddcosmo matrix
   ! (fdoka, fdokb), from the ddpcm matrix (gradr) and from the
   ! geometrical part of the rhs (fdoga) 
   fx = zero
+  fscr = zero
+  write(6,*) 'FDOKA'
   do isph = 1, nsph
-    call fdoka(isph,xs,xi(:,isph),basloc,dbsloc,vplm,vcos,vsin,fx(:,isph)) 
-    call fdokb(isph,xs,xi,basloc,dbsloc,vplm,vcos,vsin,fx(:,isph)) 
-    call gradr(isph,vplm,vcos,vsin,basloc,dbsloc,phiexp-phieexp,y,fx(:,isph))
-    call fdoga(isph,xi,phiexp-phieexp,fx(:,isph)) 
+    call fdoka(isph,xs,scr(:,isph),basloc,dbsloc,vplm,vcos,vsin,fscr(:,isph)) 
+    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+  end do
+  fx = fx + fscr
+  fscr = zero
+  write(6,*) 'FDOKB'
+  do isph = 1, nsph
+    call fdokb(isph,xs,scr,basloc,dbsloc,vplm,vcos,vsin,fscr(:,isph)) 
+    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+  end do
+  fx = fx + fscr
+  fscr = zero
+  write(6,*) 'GRADR'
+  do isph = 1, nsph
+    call gradr(isph,vplm,vcos,vsin,basloc,dbsloc,rhs-phieps,ycr,fscr(:,isph))
+    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
+  end do
+  fx = fx + fscr
+  fscr = zero
+  write(6,*) 'FDOGA'
+  do isph = 1, nsph
+    call fdoga(isph,qcr,-phiexp,fscr(:,isph)) 
+    write(6,'(1x,i5,3f16.8)') isph, fscr(:,isph)
   end do
 
   fx = pt5*fx
-  deallocate(vsin,vcos,vplm,basloc,dbsloc,xi,phiexp,phieexp,stat=istatus)
+  deallocate(vsin,vcos,vplm,basloc,dbsloc,scr,phiexp,phieexp,stat=istatus)
   if (istatus.ne.0) write(6,*) 'ddpcm forces deallocation failed'
+  deallocate(rhs,f)
+  ! debug
+  deallocate(fscr)
   end subroutine ddpcm_forces
+
+  subroutine ddpcm_zeta(zeta)
+  ! returns adjoint solution expansion at the grid points
+  ! needed for analytical derivatives
+  implicit none
+  real*8, intent(out) :: zeta(ncav)
+  integer :: ii, isph, its
+  ii = 0
+  do isph = 1, nsph
+    do its = 1, ngrid
+      if (ui(its,isph) .gt. zero) then
+        ii = ii + 1
+        zeta(ii) = w(its)*ui(its,isph)*dot_product(basis(:,its),y(:,isph))
+      end if
+    end do
+  end do
+  zeta = pt5*zeta 
+  end subroutine ddpcm_zeta
 
 !  subroutine gradr(isph,vplm,vcos,vsin,basloc,dbsloc,g,y,fx)
 !  ! compute the gradient of ddPCM R and contract it
